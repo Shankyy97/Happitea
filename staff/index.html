@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F7C600">
+<meta name="description" content="HappiTea counter app for staff.">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" type="image/png" href="../icons/icon-192.png">
+<link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="HappiTea">
+<meta name="robots" content="noindex">
+<script src="../config.js"></script>
+<script>
+window.HT_CALL=function(fn,args){
+  var url=(window.HT_CONFIG||{}).apiUrl||'';
+  if(!/^https:\/\/script\.google\.com\//.test(url))return Promise.reject(new Error('The app is not connected yet. Put your Apps Script web app link in config.js.'));
+  var body=JSON.stringify({fn:fn,args:args||[]});
+  var send=function(){return fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:body})};
+  var READ=['publicInfo','staffBoot','lookupCustomer','checkCode','teamData','records','customerList','getSettings','listStaff','feedbackList','custHome','custCheckCode','suggestAmbCode'];
+  return send().catch(function(e){if(READ.indexOf(fn)<0)throw e;return new Promise(function(r){setTimeout(r,800)}).then(send)})
+    .then(function(r){if(!r.ok)throw new Error('The server did not answer ('+r.status+'). Try again.');return r.json()},function(){throw new Error('Could not reach the server. Check the internet and try again.')})
+    .then(function(j){if(j&&j.ok)return j.data;throw new Error(j&&j.error||'Something went wrong. Try again.')});
+};
+</script>
+<title>HappiTea Counter</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Figtree:wght@400;500;600;700&display=swap">
+<style>
+html,body{margin:0}[hidden]{display:none!important}
+
+/* Layout: touch-first counter tool. Yellow nav (left rail on wide screens, sticky top bar on phones), one primary action per screen. */
+:root{
+  --bg:#FFFCF2; --surface:#FFFFFF; --sunk:#F7F1E1; --ink:#26221A; --muted:#6F6755; --line:#ECE4CF;
+  --yellow:#F7C600; --on-yellow:#231C00; --green:#1E7A3B; --green-soft:#E2F2E6;
+  --red:#B8352A; --red-soft:#FBE3E0; --amber:#8A6400; --amber-soft:#FFF2BF; --pink:#C2477A; --pink-soft:#FBE4EE;
+  --display:"Baloo 2","Trebuchet MS",system-ui,sans-serif;
+  --body:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --r:14px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#15130E; --surface:#1F1C15; --sunk:#29251C; --ink:#F4EFE0; --muted:#A9A08B; --line:#3A3429;
+  --green:#5CC07A; --green-soft:#1A3022; --red:#F0806F; --red-soft:#3A1E1A; --amber:#F2C94C; --amber-soft:#3A3115; --pink:#F08DB4; --pink-soft:#3A1E2A; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#15130E; --surface:#1F1C15; --sunk:#29251C; --ink:#F4EFE0; --muted:#A9A08B; --line:#3A3429;
+  --green:#5CC07A; --green-soft:#1A3022; --red:#F0806F; --red-soft:#3A1E1A; --amber:#F2C94C; --amber-soft:#3A3115; --pink:#F08DB4; --pink-soft:#3A1E2A; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.45}
+button,input,select{font:inherit;color:inherit}
+.num{font-variant-numeric:tabular-nums}
+header.bar{background:var(--yellow);color:var(--on-yellow);padding-block:12px 4px}
+.wrap{max-width:1120px;margin:0 auto;padding-inline:16px}
+.brand{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.brand b{font-family:var(--display);font-weight:800;font-size:28px;letter-spacing:.5px;line-height:1}
+.brand span{font-size:13px;font-weight:600;opacity:.75}
+.brand .live{margin-left:auto;font-size:13px;font-weight:700}
+nav.tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:4;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;padding:8px 16px;background:var(--yellow);box-shadow:0 1px 0 rgba(35,28,0,.15)}
+nav.tabs .side-brand{display:none}
+nav.tabs button{display:flex;flex-direction:column;align-items:center;gap:2px;border:1.5px solid rgba(35,28,0,.22);background:rgba(255,255,255,.5);padding:8px 2px;border-radius:12px;font-weight:800;font-size:13px;color:var(--on-yellow);cursor:pointer;min-width:0}
+nav.tabs button i{font-style:normal;font-size:19px;line-height:1}
+nav.tabs button span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+nav.tabs button[aria-selected="true"]{background:var(--on-yellow);color:var(--yellow);border-color:var(--on-yellow)}
+@media (max-width:440px){nav.tabs{padding:8px 8px;gap:4px}nav.tabs button{font-size:11px}}
+@media (min-width:900px){
+  nav.tabs{position:fixed;left:0;top:0;bottom:0;width:208px;display:flex;flex-direction:column;gap:8px;padding:calc(20px + env(safe-area-inset-top,0px)) 14px 20px;box-shadow:1px 0 0 rgba(35,28,0,.15)}
+  nav.tabs .side-brand{display:flex;flex-direction:column;padding:0 6px 14px;color:var(--on-yellow)}
+  nav.tabs .side-brand b{font-family:var(--display);font-weight:800;font-size:26px;line-height:1}
+  nav.tabs .side-brand span{font-size:13px;font-weight:600;opacity:.75}
+  nav.tabs button{flex-direction:row;gap:12px;justify-content:flex-start;padding:13px 14px;font-size:16px}
+  header.bar,main.wrap{margin-left:208px}
+  header.bar .brand b{display:none}
+  main.wrap,header.bar .wrap{max-width:none;padding-inline:28px}
+}
+:focus-visible{outline:3px solid var(--green);outline-offset:2px}
+main.wrap{padding-block:18px 70px}
+.notice{background:var(--amber-soft);color:var(--ink);border-radius:var(--r);padding:12px 14px;margin-bottom:14px;font-size:14px}
+h2{font-family:var(--display);font-weight:700;font-size:25px;margin:0;line-height:1.1;text-wrap:balance}
+h3{font-family:var(--display);font-weight:700;font-size:19px;margin:0}
+.label{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.muted{color:var(--muted)}
+.small{font-size:14px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;min-width:0}
+.stack{display:flex;flex-direction:column;gap:14px;min-width:0}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.between{justify-content:space-between}
+.field{display:flex;flex-direction:column;gap:6px;min-width:0}
+.big{width:100%;font-size:30px;font-weight:700;padding:12px 14px;border-radius:12px;border:2px solid var(--line);background:var(--sunk);letter-spacing:.04em}
+.big:focus{border-color:var(--yellow);background:var(--surface);outline:none}
+.in{width:100%;font-size:16px;padding:10px 12px;border-radius:10px;border:1.5px solid var(--line);background:var(--sunk)}
+select.in{appearance:auto}
+.btn{border:0;border-radius:12px;padding:13px 18px;font-weight:800;font-size:16px;cursor:pointer;background:var(--sunk);color:var(--ink)}
+.btn.primary{background:var(--yellow);color:var(--on-yellow);width:100%;font-size:20px;padding:18px;font-family:var(--display)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.ghost{background:transparent;border:1.5px solid var(--line)}
+.btn.good{background:var(--green);color:var(--surface)}
+.btn.sm{padding:8px 12px;font-size:14px;border-radius:10px}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 10px;font-size:13px;font-weight:700;white-space:nowrap}
+.pill.green{background:var(--green);color:var(--surface)}
+.pill.yellow{background:var(--yellow);color:var(--on-yellow)}
+.pill.soft{background:var(--sunk);color:var(--ink);border:1px solid var(--line)}
+.pill.red{background:var(--red-soft);color:var(--red)}
+.pill.pink{background:var(--pink-soft);color:var(--pink)}
+.pill.silver{background:var(--sunk);color:var(--ink);border:1.5px solid var(--muted)}
+.pill.gold{background:var(--amber-soft);color:var(--amber);border:1.5px solid var(--amber)}
+.err{color:var(--red);font-weight:600;font-size:14px}
+
+/* Counter */
+.counter{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:16px;align-items:start}
+@media (max-width:760px){.counter{grid-template-columns:minmax(0,1fr)}.pad{display:none}}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.key{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:15px 0;font-size:26px;font-weight:700;cursor:pointer;font-family:var(--display)}
+.key:active{background:var(--sunk)}
+.key.alt{font-size:16px;font-family:var(--body);color:var(--muted)}
+.cust{border-radius:var(--r);padding:16px;background:var(--sunk);display:flex;flex-direction:column;gap:12px}
+.cust.new{background:var(--green-soft)}
+.stamps{display:flex;gap:6px;flex-wrap:wrap}
+.stamp{width:26px;height:26px;border-radius:50%;border:2px dashed var(--muted);opacity:.55}
+.stamp.on{border:0;background:var(--yellow);opacity:1;box-shadow:inset 0 0 0 2px var(--on-yellow)}
+.stamp.free{border:2px solid var(--green);opacity:1;display:grid;place-items:center;font-size:10px;font-weight:800;color:var(--green)}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{border:1.5px solid var(--line);background:var(--surface);border-radius:999px;padding:9px 14px;font-weight:700;font-size:15px;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.ask{font-weight:700;font-size:15px;background:var(--amber-soft);border-radius:10px;padding:8px 12px}
+.calc{display:grid;grid-template-columns:1fr auto;gap:4px 16px}
+.calc .tot{font-family:var(--display);font-size:26px;font-weight:800}
+.opt{display:flex;gap:12px;align-items:center;padding:12px 14px;border-radius:12px;border:2px solid var(--green);background:var(--green-soft);cursor:pointer;font-weight:700}
+.opt.pinkb{border-color:var(--pink);background:var(--pink-soft)}
+.opt input{width:24px;height:24px;accent-color:var(--green);flex:none}
+.after{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.toggle{border:2px solid var(--line);background:var(--surface);border-radius:12px;padding:14px;font-weight:700;cursor:pointer;text-align:left}
+.toggle[aria-pressed="true"]{border-color:var(--green);background:var(--green-soft)}
+.toggle small{display:block;font-weight:500;color:var(--muted);font-size:13px}
+
+/* Home */
+.tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:760px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.tile{display:flex;flex-direction:column;gap:6px;align-items:flex-start;text-align:left;border:1.5px solid var(--line);background:var(--surface);border-radius:var(--r);padding:16px;cursor:pointer;min-height:112px;min-width:0}
+.tile b{font-family:var(--display);font-size:21px;font-weight:800;line-height:1.1}
+.tile span{font-size:14px;color:var(--muted)}
+.tile .ic{font-size:26px;line-height:1}
+.tile.hero{grid-column:span 2;background:var(--yellow);border-color:var(--yellow);color:var(--on-yellow)}
+.tile.hero b{font-size:28px}.tile.hero span{color:var(--on-yellow);opacity:.8}
+.tile.greent{background:var(--green);border-color:var(--green);color:var(--surface)}
+.tile.greent span{color:var(--surface);opacity:.85}
+
+/* Stats + lists */
+.kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;min-width:0}
+.kpi b{display:block;font-family:var(--display);font-size:28px;font-weight:800;line-height:1.1}
+.kpi span{font-size:13px;color:var(--muted);font-weight:600}
+.tbl-wrap{overflow-x:auto;max-width:100%}
+table{width:100%;border-collapse:collapse;font-size:15px}
+th{text-align:left;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap;background:var(--surface)}
+td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+td.r,th.r{text-align:right}
+tfoot td{font-weight:800;border-top:2px solid var(--line)}
+.rank{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:50%;background:var(--sunk);font-weight:800;font-size:13px}
+.rank.g{background:var(--yellow);color:var(--on-yellow)}
+.bar{height:8px;border-radius:99px;background:var(--sunk);overflow:hidden;min-width:60px}
+.bar i{display:block;height:100%;background:var(--green)}
+.hbar{height:14px;border-radius:4px;background:var(--yellow);min-width:2px}
+.empty{padding:24px 12px;text-align:center;color:var(--muted)}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:860px){.grid2{grid-template-columns:minmax(0,1fr)}}
+.form{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.form .full{grid-column:1/-1}
+@media (max-width:460px){.form{grid-template-columns:1fr}}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg button{border:1.5px solid var(--line);background:var(--surface);border-radius:999px;padding:8px 14px;font-weight:700;cursor:pointer;font-size:14px}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.rules li{margin-bottom:6px}
+.toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:12px 16px;border-radius:12px;display:flex;gap:14px;align-items:center;font-weight:700;max-width:calc(100% - 32px);z-index:9}
+.toast button{background:transparent;border:1.5px solid var(--bg);color:var(--bg);border-radius:8px;padding:6px 10px;font-weight:700;cursor:pointer}
+.editing{outline:3px solid var(--yellow);outline-offset:2px}
+.sheet{position:fixed;z-index:8;left:50%;top:50%;transform:translate(-50%,-50%);width:min(520px,calc(100% - 32px));max-height:calc(100% - 40px);overflow:auto;box-shadow:0 12px 40px rgba(0,0,0,.25)}
+@media (prefers-reduced-motion:no-preference){.cust{animation:pop .18s ease-out}@keyframes pop{from{transform:translateY(4px);opacity:.6}}}
+
+.login{max-width:400px;margin:40px auto;display:flex;flex-direction:column;gap:14px}
+.login .logo{font-family:var(--display);font-weight:800;font-size:40px;line-height:1;background:var(--yellow);color:var(--on-yellow);border-radius:18px;padding:22px;text-align:center}
+.who{font-size:13px;font-weight:700}
+.busy{opacity:.6;pointer-events:none}
+.loading{padding:30px;text-align:center;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<section id="loginView" class="wrap" hidden>
+  <div class="login">
+    <div class="logo">HAPPI TEA<div style="font-size:15px;font-weight:700;font-family:var(--body);margin-top:6px">Counter login</div></div>
+    <form id="loginForm" class="panel stack" novalidate>
+      <div class="field"><label class="label" for="lId">Login ID</label><input id="lId" class="in" autocomplete="username" autocapitalize="none"></div>
+      <div class="field"><label class="label" for="lPw">Password</label><input id="lPw" class="in" type="password" autocomplete="current-password"></div>
+      <button class="btn primary" type="submit" id="lBtn">Log in</button>
+      <div class="err" id="lErr"></div>
+    </form>
+    <p class="muted small" style="text-align:center;margin:0">Forgot your password? Ask the owner to reset it in Setup.</p>
+  </div>
+</section>
+
+<div id="appView" hidden>
+<header class="bar">
+  <div class="wrap">
+    <div class="brand"><b>HAPPI TEA</b><span>Counter · Pencil Chowk, Baramati</span><span class="live"><span class="who" id="whoAmI"></span> · <a href="#" id="logoutLink" style="color:inherit">Log out</a></span></div>
+  </div>
+</header>
+<nav class="tabs" role="tablist" aria-label="Sections" id="nav">
+  <div class="side-brand"><b>HAPPI TEA</b><span id="sideWho">Counter</span></div>
+  <button role="tab" data-tab="home"><i>⌂</i><span>Home</span></button>
+  <button role="tab" data-tab="counter"><i>🧾</i><span>Counter</span></button>
+  <button role="tab" data-tab="records" data-owner="1"><i>📊</i><span>Records</span></button>
+  <button role="tab" data-tab="loyalty" data-owner="1"><i>⭐</i><span>Loyalty</span></button>
+  <button role="tab" data-tab="team"><i>🏆</i><span>Team</span></button>
+  <button role="tab" data-tab="setup" data-owner="1"><i>⚙</i><span>Setup</span></button>
+</nav>
+
+<main class="wrap">
+  <div class="notice" id="notice" hidden></div>
+
+  <!-- HOME -->
+  <section id="view-home" class="stack">
+    <div><h2 id="homeHello">Good day</h2><div class="muted" id="homeDate"></div></div>
+    <div class="tiles">
+      <button class="tile hero" data-goto="counter"><span class="ic">🧾</span><b>Start a bill</b><span>Mobile number, code, stamps, save</span></button>
+      <button class="tile greent" data-goto="team" data-focus="aName" data-owner="1"><span class="ic">＋</span><b>Add ambassador</b><span>Code is made from their name</span></button>
+      <button class="tile" data-open="drinkForm"><span class="ic">🥤</span><b>Log a free drink</b><span id="tileDrinks">Tastings, remakes, prizes</span></button>
+      <button class="tile" data-goto="records" data-owner="1"><span class="ic">📊</span><b>Bills &amp; revenue</b><span id="tileToday">Today so far</span></button>
+      <button class="tile" data-goto="loyalty" data-owner="1"><span class="ic">⭐</span><b>Loyalty</b><span>Birthdays, win-backs, top customers</span></button>
+      <button class="tile" data-goto="team"><span class="ic">🏆</span><b>Ambassadors</b><span>Leaderboard and rewards</span></button>
+      <button class="tile" data-goto="setup" data-sub="feedback" data-owner="1"><span class="ic">💬</span><b>Feedback</b><span id="tileFb">From the customer app</span></button>
+    </div>
+    <div><h3 style="margin-bottom:10px" id="homeKpiTitle">Today</h3><div class="kpis" id="homeKpis"></div></div>
+  </section>
+
+  <!-- COUNTER -->
+  <section id="view-counter" class="counter" hidden>
+    <div class="stack">
+      <div class="panel stack">
+        <div class="field">
+          <label class="label" for="phone">Customer mobile number</label>
+          <input id="phone" class="big num" inputmode="numeric" autocomplete="off" maxlength="14" placeholder="98XXXXXXXX">
+        </div>
+        <div class="ask">Ask: “Do you have the HappiTea app or a friend's code?”</div>
+        <div class="pad" id="pad">
+          <button class="key" data-k="1">1</button><button class="key" data-k="2">2</button><button class="key" data-k="3">3</button>
+          <button class="key" data-k="4">4</button><button class="key" data-k="5">5</button><button class="key" data-k="6">6</button>
+          <button class="key" data-k="7">7</button><button class="key" data-k="8">8</button><button class="key" data-k="9">9</button>
+          <button class="key alt" data-k="clear">Clear</button><button class="key" data-k="0">0</button><button class="key alt" data-k="back">⌫ Back</button>
+        </div>
+        <p class="muted small" style="margin:0">The keypad types into whichever box you last tapped.</p>
+      </div>
+      <button class="btn ghost" data-open="drinkForm">🥤 Log a free drink that isn't a bill</button>
+      <div class="panel stack" id="myToday"></div>
+    </div>
+    <div class="stack">
+      <div class="panel empty" id="idle">
+        <h3 style="color:var(--ink)" id="idleTitle">Enter a mobile number to start</h3>
+        <p style="margin:6px 0 0">You'll see if they're new or returning, their tier and stamps, any birthday treat, and whether a referral discount applies.</p>
+      </div>
+      <div id="custCard" hidden></div>
+    </div>
+  </section>
+
+  <!-- RECORDS -->
+  <section id="view-records" class="stack" hidden>
+    <h2>Records</h2>
+    <div class="panel stack">
+      <div class="seg" id="rangeSeg">
+        <button data-range="today" aria-pressed="true">Today</button><button data-range="yesterday" aria-pressed="false">Yesterday</button>
+        <button data-range="week" aria-pressed="false">This week</button><button data-range="month" aria-pressed="false">This month</button>
+        <button data-range="lastmonth" aria-pressed="false">Last month</button><button data-range="custom" aria-pressed="false">Pick dates</button>
+      </div>
+      <div class="row" id="customRange" hidden>
+        <label class="field"><span class="label">From</span><input type="date" id="rFrom" class="in"></label>
+        <label class="field"><span class="label">To</span><input type="date" id="rTo" class="in"></label>
+        <button class="btn good sm" id="rGo" style="align-self:flex-end">Show</button>
+      </div>
+      <div class="muted small" id="rangeLabel"></div>
+    </div>
+    <div class="kpis" id="recKpis"></div>
+    <div class="seg" id="recSeg">
+      <button data-sub="days">Revenue by day</button><button data-sub="bills">All bills</button><button data-sub="drinks">Free drinks</button>
+      <button data-sub="codes">By referral code</button><button data-sub="staff">By staff</button><button data-sub="customers">Customers</button>
+    </div>
+    <div class="panel stack" id="recBody"></div>
+  </section>
+
+  <!-- LOYALTY -->
+  <section id="view-loyalty" class="stack" hidden>
+    <h2>Loyalty program</h2>
+    <div class="kpis" id="loyKpis"></div>
+    <div class="grid2">
+      <div class="panel stack"><h3>🎂 Birthdays in the next 14 days</h3><div id="loyBday"></div></div>
+      <div class="panel stack"><h3>One stamp away</h3><p class="muted small" style="margin:0">Message them: one more visit gets a free drink.</p><div id="loyNear"></div></div>
+      <div class="panel stack"><h3>Win back</h3><p class="muted small" style="margin:0" id="loyLapseNote"></p><div id="loyLapsed"></div></div>
+      <div class="panel stack"><h3>Top customers</h3><div id="loyTop"></div></div>
+    </div>
+  </section>
+
+  <!-- TEAM -->
+  <section id="view-team" class="stack" hidden>
+    <div><h2>Ambassadors</h2><div class="muted" id="ambSub"></div></div>
+    <div class="kpis" id="ambKpis"></div>
+    <div class="panel stack">
+      <h3>Leaderboard</h3>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>#</th><th>Ambassador</th><th>Code</th><th class="r">Month</th><th>Week</th><th class="r">All time</th><th class="r" data-owner="1">Customers spent</th><th>Drinks due</th></tr></thead>
+        <tbody id="ambRows"></tbody>
+      </table></div>
+      <p class="muted small" style="margin:0">Counts are unique new customers who used the code on their first bill.</p>
+    </div>
+    <div class="panel stack" id="lastMonth"></div>
+    <div class="grid2" data-owner="1">
+      <div class="panel stack" id="ambFormPanel">
+        <h3 id="ambFormTitle">Add an ambassador</h3>
+        <form id="ambForm" class="form" novalidate>
+          <div class="field"><label class="label" for="aName">Full name</label><input id="aName" class="in" autocomplete="off"></div>
+          <div class="field"><label class="label" for="aCollege">College</label><input id="aCollege" class="in"></div>
+          <div class="field"><label class="label" for="aPhone">Their mobile</label><input id="aPhone" class="in num" inputmode="numeric" maxlength="14"></div>
+          <div class="field"><label class="label" for="aCode">Code</label><input id="aCode" class="in num" style="text-transform:uppercase" maxlength="20"></div>
+          <div class="full muted small" id="codeHint"></div>
+          <div class="full row"><button class="btn good" type="submit" id="ambSubmit">Add ambassador</button><button class="btn ghost" type="button" id="ambCancel" hidden>Cancel edit</button><span class="err" id="ambErr"></span></div>
+        </form>
+      </div>
+      <div class="panel stack">
+        <div class="row between"><h3>Team list</h3><button class="btn ghost sm" id="regenAll">Match all codes to the current %</button></div>
+        <div id="ambList"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SETUP -->
+  <section id="view-setup" class="stack" hidden>
+    <h2>Setup</h2>
+    <div class="seg" id="setSeg">
+      <button data-ss="rules" aria-pressed="true">Program rules</button><button data-ss="staff" aria-pressed="false">Staff logins</button>
+      <button data-ss="feedback" aria-pressed="false">Feedback</button><button data-ss="links" aria-pressed="false">Links &amp; café info</button>
+    </div>
+    <form id="setForm" class="stack" data-ssv="rules" novalidate>
+      <div class="grid2">
+        <div class="panel stack"><h3>Referral codes</h3><div class="form">
+          <div class="field"><label class="label" for="s_discountPct">Discount (%)</label><input id="s_discountPct" class="in num" inputmode="numeric"></div>
+          <div class="field"><label class="label" for="s_minBill">Minimum bill (₹)</label><input id="s_minBill" class="in num" inputmode="numeric"></div>
+          <div class="field"><label class="label" for="s_discountVisits">Works for first … visits</label><input id="s_discountVisits" class="in num" inputmode="numeric"></div>
+          <div class="field"><label class="label" for="s_referBonusStamps">Bonus stamps for the friend who referred</label><input id="s_referBonusStamps" class="in num" inputmode="numeric"></div>
+        </div></div>
+        <div class="panel stack"><h3>Stamp card</h3><div class="form">
+          <div class="field"><label class="label" for="s_stampTarget">Stamps for a free drink</label><input id="s_stampTarget" class="in num" inputmode="numeric"></div>
+          <div class="field"><label class="label" for="s_stampMinBill">Minimum bill for a stamp (₹)</label><input id="s_stampMinBill" class="in num" inputmode="numeric"></div>
+          <div class="field"><label class="label" for="s_freeDrinkCap">Free drink worth up to (₹)</label><input id="s_freeDrinkCap" class="in num" inputmode="numeric"></div>
+          <div class="field"><label class="label" for="s_drinkCost">Our cost per free drink (₹)</label><input id="s_drinkCost" class="in num" inputmode="numeric"></div>
+        </div></div>
+        <div class="panel stack"><h3>Tiers</h3><div class="form">
+          <div class="field"><label class="label" for="s_silverVisits">Silver from visit</label><input id="s_silverVisits" class="in num" inputmode="numeric"></div>
+          <div class="field"><label class="label" for="s_goldVisits">Gold from visit</label><input id="s_goldVisits" class="in num" inputmode="numeric"></div>
+          <div class="field full"><label class="label" for="s_silverPerk">Silver perk</label><input id="s_silverPerk" class="in"></div>
+          <div class="field full"><label class="label" for="s_goldPerk">Gold perk</label><input id="s_goldPerk" class="in"></div>
+          <div class="field full"><label class="label" for="s_lapseDays">Win-back list after … days away</label><input id="s_lapseDays" class="in num" inputmode="numeric"></div>
+        </div></div>
+        <div class="panel stack"><h3>Ambassador rewards</h3><div class="form">
+          <div class="field"><label class="label" for="s_weeklyMin">Referrals a week for a free drink</label><input id="s_weeklyMin" class="in num" inputmode="numeric"></div>
+          <div class="field"><label class="label" for="s_milestoneEvery">Milestone drink every … referrals</label><input id="s_milestoneEvery" class="in num" inputmode="numeric"></div>
+        </div></div>
+      </div>
+      <div class="row"><button class="btn good" type="submit">Save rules</button><span class="muted" id="setMsg"></span></div>
+    </form>
+    <div class="grid2" data-ssv="staff" hidden>
+      <div class="panel stack">
+        <h3 id="stFormTitle">Add a staff login</h3>
+        <form id="stForm" class="form" novalidate>
+          <div class="field"><label class="label" for="stName">Name</label><input id="stName" class="in"></div>
+          <div class="field"><label class="label" for="stId">Login ID</label><input id="stId" class="in" autocapitalize="none" placeholder="e.g. rahul"></div>
+          <div class="field"><label class="label" for="stPw">Password</label><input id="stPw" class="in" type="text" autocomplete="new-password" placeholder="At least 6 characters"></div>
+          <div class="field"><label class="label" for="stRole">Access</label><select id="stRole" class="in"><option value="staff">Counter staff</option><option value="owner">Owner (everything)</option></select></div>
+          <div class="full muted small" id="stHint">Counter staff can bill, log drinks and give ambassador rewards. Only owners see revenue, customer lists and settings.</div>
+          <div class="full row"><button class="btn good" type="submit" id="stSubmit">Add login</button><button class="btn ghost" type="button" id="stCancel" hidden>Cancel</button><span class="err" id="stErr"></span></div>
+        </form>
+      </div>
+      <div class="panel stack"><h3>Logins</h3><div id="staffList"></div></div>
+    </div>
+    <div class="panel stack" data-ssv="feedback" hidden><h3>Customer feedback</h3><p class="muted small" style="margin:0">Ratings of 3 or below come here so you can call the customer. Happy customers are sent to your Google review page.</p><div id="fbList"></div></div>
+    <form id="linkForm" class="panel stack" data-ssv="links" hidden novalidate>
+      <div class="form">
+        <div class="field"><label class="label" for="s_cafeName">Café name</label><input id="s_cafeName" class="in"></div>
+        <div class="field"><label class="label" for="s_hours">Opening hours</label><input id="s_hours" class="in" placeholder="10 am to 11 pm"></div>
+        <div class="field full"><label class="label" for="s_address">Address</label><input id="s_address" class="in"></div>
+        <div class="field full"><label class="label" for="s_googleReviewUrl">Google review link</label><input id="s_googleReviewUrl" class="in" placeholder="https://g.page/r/..."></div>
+        <div class="field full"><label class="label" for="s_whatsappUrl">WhatsApp community link</label><input id="s_whatsappUrl" class="in" placeholder="https://chat.whatsapp.com/..."></div>
+        <div class="field full"><label class="label" for="s_instagramUrl">Instagram link</label><input id="s_instagramUrl" class="in" placeholder="https://instagram.com/..."></div>
+      </div>
+      <p class="muted small" style="margin:0">Menu items and offers are edited in the Google Sheet, on the Menu and Offers tabs.</p>
+      <div class="row"><button class="btn good" type="submit">Save</button><span class="muted" id="linkMsg"></span></div>
+      <div class="panel" style="background:var(--sunk)"><span class="label">Customer app link</span><div class="row" style="margin-top:6px"><code id="custLink" class="num" style="word-break:break-all"></code><button type="button" class="btn ghost sm" id="copyCustLink">Copy</button></div><p class="muted small" style="margin:6px 0 0">Put this link on a QR code at the counter and on tables.</p></div>
+    </form>
+  </section>
+</main>
+</div>
+
+<div id="drinkForm" class="panel stack sheet" hidden>
+  <div class="row between"><h3>Log a free drink</h3><button class="btn ghost sm" data-close="drinkForm">Close</button></div>
+  <form id="dForm" class="form" novalidate>
+    <div class="field full"><label class="label" for="dType">Reason</label>
+      <select id="dType" class="in">
+        <option value="amb_prize">Ambassador monthly prize (daily drink)</option>
+        <option value="tasting">Tasting / preview</option>
+        <option value="remake">Complaint / remake</option>
+        <option value="influencer">Creator / influencer</option>
+        <option value="staff">Staff drink</option>
+        <option value="other">Other</option>
+      </select></div>
+    <div class="field full" id="dAmbWrap"><label class="label" for="dAmb">Ambassador</label><select id="dAmb" class="in"></select></div>
+    <div class="field" id="dWhoWrap"><label class="label" for="dWho">Given to (name or mobile)</label><input id="dWho" class="in"></div>
+    <div class="field"><label class="label" for="dQty">How many drinks</label><input id="dQty" class="in num" inputmode="numeric" value="1"></div>
+    <div class="field full"><label class="label" for="dNote">Note</label><input id="dNote" class="in" placeholder="e.g. Salt coffee for preview guest"></div>
+    <div class="full row"><button class="btn good" type="submit" id="dBtn">Save</button><span class="err" id="dErr"></span></div>
+  </form>
+</div>
+
+<div class="toast" id="toast" hidden><span id="toastMsg"></span><button id="toastUndo" hidden>Undo</button></div>
+
+<script>
+(function(){
+const DTYPE={loyalty:'Stamp card reward',birthday:'Birthday treat',amb_week:'Ambassador weekly drink',amb_milestone:'Ambassador milestone',amb_prize:'Ambassador monthly prize',
+  amb_place:'Ambassador prize (2nd/3rd)',tasting:'Tasting / preview',remake:'Complaint / remake',influencer:'Creator / influencer',staff:'Staff drink',other:'Other'};
+const S={token:null,user:null,settings:{},ambs:[],boot:null,cust:null,custPhone:'',sel:null,ref:null,redeem:false,bday:false,saved:null,
+  focusField:'phone',range:'today',sub:'days',rec:null,custs:null,team:null,editAmb:null,editStaff:null,ss:'rules',lookupSeq:0};
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const rs=n=>'₹'+Math.round(n||0).toLocaleString('en-IN');
+function pad2(n){return String(n).padStart(2,'0')}
+function dk(d){return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate())}
+function addDays(key,n){const d=new Date(key+'T12:00:00');d.setDate(d.getDate()+n);return dk(d)}
+function weekStart(d){const x=new Date(d);x.setDate(x.getDate()-((x.getDay()+6)%7));return dk(x)}
+const fmtD=k=>k?new Date(k+'T12:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'}):'';
+const fmtT=t=>t?new Date(t).toLocaleTimeString('en-IN',{hour:'numeric',minute:'2-digit'}):'';
+const mask=p=>p?String(p).slice(0,2)+'xxxxx'+String(p).slice(7):'';
+const showBday=md=>md?new Date('2000-'+md+'T12:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'}):'';
+function normPhone(v){let p=String(v||'').replace(/\D/g,'');if(p.length>10&&p.startsWith('91'))p=p.slice(2);if(p.length===11&&p.startsWith('0'))p=p.slice(1);return p}
+const kpiHtml=k=>k.map(x=>'<div class="kpi"><b class="num">'+x[0]+'</b><span>'+x[1]+'</span></div>').join('');
+const isOwner=()=>S.user&&S.user.role==='owner';
+const tierPill=t=>t==='Gold'?'<span class="pill gold">★ Gold</span>':t==='Silver'?'<span class="pill silver">Silver</span>':'<span class="pill soft">Member</span>';
+
+/* ---------- server calls ---------- */
+function rawCall(fn,args){
+  if(window.HT_CALL)return window.HT_CALL(fn,args);
+  return new Promise((res,rej)=>google.script.run.withSuccessHandler(res).withFailureHandler(rej)[fn](...args));
+}
+function api(fn,...args){
+  return rawCall(fn,args).catch(e=>{
+    const m=String(e&&e.message||e).replace(/^Error:\s*/,'').replace(/^Exception:\s*/,'');
+    if(m.indexOf('LOGIN:')===0){forceLogin(m.slice(6).trim());throw new Error(m.slice(6).trim())}
+    throw new Error(m);
+  });
+}
+const call=(fn,...args)=>api(fn,S.token,...args);
+
+let tt;function toast(msg,undo){$('toastMsg').textContent=msg;$('toastUndo').hidden=!undo;$('toast').hidden=false;clearTimeout(tt);tt=setTimeout(()=>$('toast').hidden=true,undo?12000:4000)}
+function notice(m){$('notice').textContent=m||'';$('notice').hidden=!m}
+
+/* ---------- login ---------- */
+function forceLogin(msg){try{localStorage.removeItem('ht_staff')}catch(e){}S.token=null;$('appView').hidden=true;$('loginView').hidden=false;if(msg)$('lErr').textContent=msg}
+$('loginForm').addEventListener('submit',async e=>{
+  e.preventDefault();$('lErr').textContent='';$('lBtn').disabled=true;$('lBtn').textContent='Logging in…';
+  try{const r=await api('staffLogin',$('lId').value,$('lPw').value);S.token=r.token;try{localStorage.setItem('ht_staff',r.token)}catch(e){}$('lPw').value='';await start()}
+  catch(err){$('lErr').textContent=err.message}
+  finally{$('lBtn').disabled=false;$('lBtn').textContent='Log in'}
+});
+$('logoutLink').addEventListener('click',e=>{e.preventDefault();api('logout',S.token).catch(()=>{});forceLogin('')});
+
+async function start(){
+  $('loginView').hidden=true;$('appView').hidden=false;notice('');
+  S.boot=await call('staffBoot');S.user=S.boot.user;S.settings=S.boot.settings;S.ambs=S.boot.ambassadors;
+  $('whoAmI').textContent=S.user.name+(isOwner()?' (owner)':'');$('sideWho').textContent=S.user.name;
+  document.querySelectorAll('[data-owner]').forEach(el=>el.hidden=!isOwner());
+  let t='home';try{const x=localStorage.getItem('ht_tab');if(x&&$('view-'+x)&&(isOwner()||!document.querySelector('nav [data-tab="'+x+'"]').dataset.owner))t=x}catch(e){}
+  showTab(t);
+}
+async function refreshBoot(){try{S.boot=await call('staffBoot');S.settings=S.boot.settings;S.ambs=S.boot.ambassadors;if(cur()==='home')renderHome();renderMyToday()}catch(e){}}
+
+/* ---------- nav ---------- */
+const VIEWS=['home','counter','records','loyalty','team','setup'];
+document.querySelectorAll('nav.tabs button').forEach(b=>b.addEventListener('click',()=>showTab(b.dataset.tab)));
+document.addEventListener('click',async e=>{
+  const g=e.target.closest('[data-goto]');
+  if(g){if(g.dataset.sub)S.ss=g.dataset.sub;showTab(g.dataset.goto);if(g.dataset.focus)setTimeout(()=>{const f=$(g.dataset.focus);if(f){f.scrollIntoView({block:'center'});f.focus()}},80);return}
+  if(e.target.closest('[data-open]')){openDrinkForm();return}
+  const c=e.target.closest('[data-close]');if(c){$(c.dataset.close).hidden=true;return}
+  const oc=e.target.closest('[data-counter]');if(oc){showTab('counter');$('phone').value=oc.dataset.counter;onPhone();return}
+  const cp=e.target.closest('[data-copy]');if(cp){try{await navigator.clipboard.writeText(cp.dataset.copy);toast('Copied '+cp.dataset.copy)}catch(err){toast(cp.dataset.copy)}}
+});
+function showTab(t){
+  try{window.scrollTo(0,0)}catch(e){}
+  document.querySelectorAll('nav.tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===t));
+  VIEWS.forEach(v=>$('view-'+v).hidden=v!==t);
+  try{localStorage.setItem('ht_tab',t)}catch(e){}
+  ({home:renderHome,counter:()=>{renderMyToday();if(!S.saved)setTimeout(()=>$('phone').focus(),30)},records:loadRecords,loyalty:loadLoyalty,team:loadTeam,setup:renderSetup})[t]();
+}
+const cur=()=>VIEWS.find(v=>!$('view-'+v).hidden);
+
+/* ---------- home ---------- */
+function renderHome(){
+  const h=new Date().getHours();$('homeHello').textContent=(h<12?'Good morning':h<17?'Good afternoon':'Good evening')+', '+S.user.name.split(' ')[0];
+  $('homeDate').textContent=new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long'})+' · HappiTea, Pencil Chowk';
+  const b=S.boot||{};
+  $('tileDrinks').textContent=(b.todayDrinks||0)+' given today';
+  if(isOwner()&&b.todayAll){
+    $('tileToday').textContent=b.todayAll.bills+' bills · '+rs(b.todayAll.collected)+' today';
+    $('tileFb').textContent=b.openFeedback?b.openFeedback+' need a reply':'Nothing waiting';
+    $('homeKpiTitle').textContent='Today, whole café';
+    $('homeKpis').innerHTML=kpiHtml([[b.todayAll.bills,'Bills'],[rs(b.todayAll.collected),'Collected'],[b.todayAll.newCustomers,'New customers'],[b.todayAll.viaRef,'New via codes'],[b.todayDrinks||0,'Free drinks'],[b.mine.bills,'Your bills']]);
+  }else{
+    $('homeKpiTitle').textContent='Your shift today';
+    $('homeKpis').innerHTML=kpiHtml([[b.mine?b.mine.bills:0,'Bills you made'],[rs(b.mine?b.mine.collected:0),'You collected'],[b.todayDrinks||0,'Free drinks (café)']]);
+  }
+}
+function renderMyToday(){const b=S.boot;if(!b)return;$('myToday').innerHTML='<span class="label">Your shift today</span><div class="row"><b class="num">'+b.mine.bills+' bills</b><span class="muted">·</span><b class="num">'+rs(b.mine.collected)+' collected</b></div>'}
+
+/* ---------- keypad ---------- */
+$('phone').addEventListener('focus',()=>S.focusField='phone');
+document.addEventListener('focusin',e=>{if(e.target&&e.target.id==='bill')S.focusField='bill'});
+$('pad').addEventListener('pointerdown',e=>{if(e.target.closest('.key'))e.preventDefault()});
+$('pad').addEventListener('click',e=>{
+  const k=e.target.closest('.key');if(!k)return;const el=S.focusField==='bill'&&$('bill')?$('bill'):$('phone');
+  if(k.dataset.k==='clear')el.value='';else if(k.dataset.k==='back')el.value=el.value.slice(0,-1);else el.value+=k.dataset.k;
+  el.dispatchEvent(new Event('input',{bubbles:true}));
+});
+$('phone').addEventListener('input',onPhone);
+
+/* ---------- counter ---------- */
+function resetSel(){S.sel=null;S.ref=null;S.redeem=false;S.bday=false;S.saved=null;S.cust=null}
+async function onPhone(){
+  const phone=normPhone($('phone').value);resetSel();
+  if(phone.length!==10){S.custPhone='';$('custCard').hidden=true;$('idle').hidden=false;$('idleTitle').textContent=phone.length>10?'That number is too long':'Enter a mobile number to start';return}
+  if(phone===S.custPhone&&S.cust!==undefined){}
+  S.custPhone=phone;$('idle').hidden=true;$('custCard').hidden=false;$('custCard').innerHTML='<div class="cust loading">Looking up '+esc(phone)+'…</div>';
+  const seq=++S.lookupSeq;
+  try{const c=await call('lookupCustomer',phone);if(seq!==S.lookupSeq)return;S.cust=c;if(c&&c.referrer)S.ref=c.referrer;renderCust()}
+  catch(e){if(seq===S.lookupSeq)$('custCard').innerHTML='<div class="cust"><div class="err">'+esc(e.message)+'</div></div>'}
+}
+function firstBill(){return !S.cust||S.cust.visits===0}
+function renderCust(){
+  const c=S.cust,st=S.settings,phone=S.custPhone,first=firstBill();
+  const stamps=c?c.stamps:0,due=c&&stamps>=st.stampTarget,tier=c?c.tier:'Member';
+  let h='<div class="cust'+(first?' new':'')+'"><div class="row">';
+  h+=!c?'<span class="pill green">New customer</span>':first?'<span class="pill green">First bill</span><span class="pill soft">Registered on the app</span>':'<span class="pill yellow">Visit '+(c.visits+1)+'</span>'+tierPill(tier);
+  if(c&&c.name)h+='<b>'+esc(c.name)+'</b>';
+  if(c&&c.referrer)h+='<span class="pill soft">Referred by '+esc(c.referrer.name)+'</span>';
+  if(c&&c.birthday&&c.bdayIn!==null&&c.bdayIn<=7)h+='<span class="pill pink">🎂 '+esc(showBday(c.birthday))+'</span>';
+  h+='</div>';
+  if(c&&!first&&tier!=='Member')h+='<div class="small"><b>'+tier+' perk:</b> '+esc(tier==='Gold'?st.goldPerk:st.silverPerk)+'</div>';
+  if(!c||!c.name||!c.birthday){
+    h+='<div class="form">';
+    if(!c||!c.name)h+='<div class="field"><label class="label" for="cname">Name</label><input id="cname" class="in" autocomplete="off"></div>';
+    if(!c||!c.birthday)h+='<div class="field"><label class="label" for="cbday">Birthday (DD/MM, optional)</label><input id="cbday" class="in num" inputmode="numeric" placeholder="14/02"></div>';
+    h+='</div>';
+  }
+  if(first&&!(c&&c.referrer)){
+    const act=S.ambs.filter(a=>a.active).sort((a,b)=>String(a.code).localeCompare(b.code));
+    h+='<div class="field"><span class="label">Referral code</span><div class="chips" id="codeChips"><button class="chip" aria-pressed="'+(!S.ref)+'" data-code="">No code</button>';
+    act.forEach(a=>h+='<button class="chip num" aria-pressed="'+(S.ref&&S.ref.code===a.code)+'" data-code="'+esc(a.code)+'">'+esc(a.code)+'</button>');
+    h+='</div><div class="row"><input id="friendCode" class="in num" style="flex:1;min-width:140px;text-transform:uppercase" placeholder="Friend\'s code, e.g. SNEHA821" value="'+esc(S.ref&&S.ref.type==='cust'?S.ref.code:'')+'"><button class="btn ghost sm" id="checkCode">Check</button></div><div id="codeMsg" class="small"></div></div>';
+  }
+  if(c&&!first){
+    h+='<div class="field"><span class="label">Stamp card · '+Math.min(stamps,st.stampTarget)+' of '+st.stampTarget+'</span><div class="stamps">';
+    for(let i=0;i<st.stampTarget;i++)h+='<span class="stamp'+(i<stamps?' on':'')+'"></span>';
+    h+='<span class="stamp free">FREE</span></div></div>';
+    if(due)h+='<label class="opt"><input type="checkbox" id="redeem" '+(S.redeem?'checked':'')+'> Card is full: give a free drink now (up to '+rs(st.freeDrinkCap)+')</label>';
+    if(c.bdayDue)h+='<label class="opt pinkb"><input type="checkbox" id="bdayChk" '+(S.bday?'checked':'')+'> 🎂 Birthday week: give the birthday drink (once a year)</label>';
+  }
+  h+='<div class="field"><label class="label" for="bill">Bill amount before discount (₹)</label><input id="bill" class="big num" inputmode="numeric" autocomplete="off" placeholder="0"></div>';
+  h+='<div id="calc"></div><button class="btn primary" id="saveBtn" disabled>Save visit</button><div id="saveErr" class="err"></div>';
+  if(c)h+='<details><summary class="muted small" style="cursor:pointer">App PIN for this customer</summary><div class="row" style="margin-top:8px"><input id="pinSet" class="in num" inputmode="numeric" maxlength="4" placeholder="New 4-digit PIN" style="max-width:180px"><button class="btn ghost sm" id="pinBtn">Set PIN</button><span class="muted small">'+(c.hasPin?'Has a PIN already. This replaces it.':'No app PIN yet.')+'</span></div></details>';
+  h+='</div>';
+  const keep={};['bill','cname','cbday','friendCode'].forEach(i=>{if($(i))keep[i]=$(i).value});const act=document.activeElement&&document.activeElement.id;
+  $('custCard').innerHTML=h;Object.keys(keep).forEach(i=>{if($(i))$(i).value=keep[i]});if(act&&$(act)&&keep[act]!==undefined)$(act).focus();
+  $('bill').addEventListener('input',updateCalc);$('bill').addEventListener('keydown',e=>{if(e.key==='Enter')save()});
+  $('saveBtn').addEventListener('click',save);
+  if($('redeem'))$('redeem').addEventListener('change',e=>{S.redeem=e.target.checked;updateCalc()});
+  if($('bdayChk'))$('bdayChk').addEventListener('change',e=>{S.bday=e.target.checked;updateCalc()});
+  if($('codeChips'))$('codeChips').addEventListener('click',e=>{const b=e.target.closest('.chip');if(!b)return;const a=S.ambs.find(x=>x.code===b.dataset.code);S.ref=a?{type:'amb',name:a.name,code:a.code,active:true,phone:a.phone}:null;if($('friendCode'))$('friendCode').value='';renderCust()});
+  if($('checkCode'))$('checkCode').addEventListener('click',checkFriendCode);
+  if($('friendCode'))$('friendCode').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();checkFriendCode()}});
+  if($('pinBtn'))$('pinBtn').addEventListener('click',async()=>{try{await call('staffSetCustomerPin',phone,$('pinSet').value);toast('PIN set. They can now log in to the app.');$('pinSet').value=''}catch(e){toast(e.message)}});
+  updateCalc();
+}
+async function checkFriendCode(){
+  const code=$('friendCode').value.trim();if(!code){S.ref=null;renderCust();return}
+  $('codeMsg').textContent='Checking…';
+  try{const r=await call('checkCode',code,S.custPhone);
+    if(!r||r.invalid){S.ref=null;$('codeMsg').innerHTML='<span class="err">'+(r&&r.own?'That is their own code.':'Code not found.')+'</span>';updateCalc();return}
+    S.ref=r;renderCust();$('codeMsg').innerHTML='<span class="pill green">'+esc(r.code)+' · '+esc(r.name)+(r.type==='cust'?' (friend)':' (ambassador)')+'</span>'}
+  catch(e){$('codeMsg').innerHTML='<span class="err">'+esc(e.message)+'</span>'}
+}
+function preview(bill){
+  const st=S.settings,c=S.cust,ref=S.ref;
+  if(!ref)return{ok:false};
+  if(ref.active===false)return{ok:false,why:ref.name+' is no longer an active ambassador'};
+  if(ref.phone&&ref.phone===S.custPhone)return{ok:false,why:'Nobody can use their own code'};
+  if((c?c.visits:0)>=st.discountVisits)return{ok:false,why:'Referral discount is only for the first '+st.discountVisits+' visit'+(st.discountVisits>1?'s':'')};
+  if(!(bill>=st.minBill))return{ok:false,why:'Referral discount needs a bill of '+rs(st.minBill)+' or more'};
+  return{ok:true,amount:Math.round(bill*st.discountPct/100)};
+}
+function stampPreview(bill){const st=S.settings,c=S.cust;if(S.redeem)return{earn:false,why:'card restarts after the free drink'};if(c&&c.lastStampDate===dk(new Date()))return{earn:false,why:'already got today\'s stamp'};if(!(bill>=st.stampMinBill))return{earn:false,why:'stamps need a bill of '+rs(st.stampMinBill)+' or more'};return{earn:true}}
+function billVal(){return Number(($('bill')&&$('bill').value||'').replace(/[^\d.]/g,''))||0}
+function updateCalc(){
+  const bill=billVal(),el=preview(bill),sr=stampPreview(bill);let h='';
+  if(S.redeem||S.bday)h+='<div class="row" style="margin-bottom:6px">'+(S.redeem?'<span class="pill green">Free drink from stamp card</span>':'')+(S.bday?'<span class="pill pink">Birthday drink</span>':'')+'</div>';
+  if(bill>0){
+    const d=el.ok?el.amount:0;
+    h+='<div class="calc num"><span>Bill</span><span>'+rs(bill)+'</span>';
+    if(S.ref)h+='<span>Code '+esc(S.ref.code)+(el.ok?' ('+S.settings.discountPct+'% off)':'')+'</span><span>'+(el.ok?'− '+rs(d):'—')+'</span>';
+    h+='<span class="tot">Collect</span><span class="tot">'+rs(bill-d)+'</span></div>';
+    if(S.ref&&!el.ok&&el.why)h+='<div class="pill red" style="margin-top:8px;white-space:normal">'+esc(el.why)+'</div>';
+    h+='<div class="small muted" style="margin-top:6px">'+(sr.earn?'⭐ Earns 1 stamp':'No stamp: '+esc(sr.why))+'</div>';
+  }
+  $('calc').innerHTML=h;$('saveBtn').disabled=!(bill>0||S.redeem||S.bday);
+}
+async function save(){
+  const btn=$('saveBtn');if(!btn||btn.disabled)return;
+  btn.disabled=true;btn.textContent='Saving…';$('saveErr').textContent='';
+  try{
+    const r=await call('saveVisit',{phone:S.custPhone,bill:billVal(),name:$('cname')?$('cname').value:'',birthday:$('cbday')?$('cbday').value:'',code:S.ref&&!(S.cust&&S.cust.referrer)?S.ref.code:'',redeem:S.redeem,bday:S.bday});
+    S.saved=r;afterSave(r);toast('Saved · collect '+rs(r.collected),true);refreshBoot();
+  }catch(e){btn.disabled=false;btn.textContent='Save visit';$('saveErr').textContent=e.message}
+}
+function afterSave(r){
+  const c=r.customer,st=S.settings;
+  let h='<div class="cust new"><div class="row"><span class="pill green">Saved</span><b>'+esc(c.name||mask(c.phone))+'</b>'+tierPill(c.tier)+'</div>';
+  h+='<div class="calc num"><span class="tot">Collect</span><span class="tot">'+rs(r.collected)+'</span></div>';
+  h+='<div class="muted">'+(r.redeem?'Free drink given, card restarted. ':'Stamps: '+c.stamps+' of '+st.stampTarget+(r.stampEarned?' (+1 today). ':' (no stamp: '+esc(r.stampWhy)+'). '))+(r.bday?'Birthday drink given. ':'')+(r.discount?'Referral discount '+rs(r.discount)+'.':r.discountWhy?'No discount: '+esc(r.discountWhy)+'.':'')+'</div>';
+  if(r.tierUp)h+='<div class="pill gold" style="white-space:normal">Just reached '+esc(c.tier)+'! Tell them about their perk.</div>';
+  if(!c.hasPin)h+='<div class="ask">Tell them: “Get the HappiTea app to see your stamps. Your friend code is <b>'+esc(c.refCode)+'</b>.”</div>';
+  h+='<span class="label">Before they leave, tap what you did</span><div class="after">';
+  h+='<button class="toggle" id="tWa" aria-pressed="'+!!c.whatsapp+'">Invited to WhatsApp<small>'+(c.whatsapp?'Already joined':'Show the QR at the counter')+'</small></button>';
+  h+='<button class="toggle" id="tRv" aria-pressed="'+!!c.review+'">Asked for a Google review<small>'+(c.review?'Already asked':'Point to the table QR')+'</small></button>';
+  h+='</div><button class="btn primary" id="nextBtn">Next customer</button></div>';
+  $('custCard').innerHTML=h;
+  const flag=async(field,btn)=>{const on=btn.getAttribute('aria-pressed')!=='true';btn.setAttribute('aria-pressed',on);try{await call('setCustomerFlag',c.phone,field,on)}catch(e){btn.setAttribute('aria-pressed',!on);toast(e.message)}};
+  $('tWa').addEventListener('click',()=>flag('whatsapp',$('tWa')));$('tRv').addEventListener('click',()=>flag('review',$('tRv')));
+  $('nextBtn').addEventListener('click',resetCounter);
+}
+function resetCounter(){resetSel();S.custPhone='';$('phone').value='';$('custCard').innerHTML='';$('custCard').hidden=true;$('idle').hidden=false;$('idleTitle').textContent='Enter a mobile number to start';$('phone').focus()}
+$('toastUndo').addEventListener('click',async()=>{
+  $('toast').hidden=true;
+  try{
+    if(S.lastDrink){await call('deleteDrink',S.lastDrink);S.lastDrink=null;toast('Removed');refreshBoot();return}
+    if(!S.saved)return;await call('undoVisit',S.saved.visitId);toast('Bill removed');const p=S.saved.customer.phone;S.saved=null;
+    if(S.custPhone===p&&cur()==='counter'){S.custPhone='';onPhone()}refreshBoot();
+  }catch(e){toast(e.message)}
+});
+
+/* ---------- free drinks ---------- */
+function openDrinkForm(){
+  $('dAmb').innerHTML=S.ambs.length?S.ambs.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(a=>'<option value="'+esc(a.id)+'">'+esc(a.name)+' ('+esc(a.code)+')</option>').join(''):'<option value="">No ambassadors yet</option>';
+  $('dErr').textContent='';$('dQty').value=1;$('dNote').value='';$('dWho').value='';syncDType();$('drinkForm').hidden=false;$('dType').focus();
+}
+function syncDType(){const amb=$('dType').value.indexOf('amb')===0;$('dAmbWrap').hidden=!amb;$('dWhoWrap').hidden=amb}
+$('dType').addEventListener('change',syncDType);
+$('dForm').addEventListener('submit',async e=>{
+  e.preventDefault();$('dErr').textContent='';$('dBtn').disabled=true;
+  try{const r=await call('logDrink',{type:$('dType').value,qty:$('dQty').value,to:$('dWho').value,ambId:$('dAmb').value,note:$('dNote').value});
+    $('drinkForm').hidden=true;S.saved=null;S.lastDrink=r.id;toast('Free drink logged',true);refreshBoot()}
+  catch(err){$('dErr').textContent=err.message}finally{$('dBtn').disabled=false}
+});
+$('toastUndo').addEventListener('click',()=>{},true);
+const _toast=toast;toast=function(m,u){if(!u)S.lastDrink=S.lastDrink;_toast(m,u)};
+
+/* ---------- records ---------- */
+function rangeDates(){
+  const t=dk(new Date()),n=new Date();
+  switch(S.range){
+    case'today':return[t,t];case'yesterday':{const y=addDays(t,-1);return[y,y]}
+    case'week':return[weekStart(n),t];case'month':return[t.slice(0,8)+'01',t];
+    case'lastmonth':return[dk(new Date(n.getFullYear(),n.getMonth()-1,1)),dk(new Date(n.getFullYear(),n.getMonth(),0))];
+    default:{let f=$('rFrom').value||t,to=$('rTo').value||t;if(f>to)[f,to]=[to,f];return[f,to]}
+  }
+}
+$('rangeSeg').addEventListener('click',e=>{const b=e.target.closest('[data-range]');if(!b)return;S.range=b.dataset.range;
+  $('rangeSeg').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x===b));$('customRange').hidden=S.range!=='custom';
+  if(S.range==='custom'&&!$('rFrom').value){$('rFrom').value=addDays(dk(new Date()),-6);$('rTo').value=dk(new Date())}if(S.range!=='custom')loadRecords()});
+$('rGo').addEventListener('click',loadRecords);
+$('recSeg').addEventListener('click',e=>{const b=e.target.closest('[data-sub]');if(!b)return;S.sub=b.dataset.sub;renderRecords()});
+let recSeq=0;
+async function loadRecords(){
+  const [f,t]=rangeDates();const seq=++recSeq;$('rangeLabel').textContent=f===t?fmtD(f):fmtD(f)+' to '+fmtD(t);
+  $('recBody').innerHTML='<div class="loading">Loading…</div>';
+  try{const r=await call('records',f,t);if(seq!==recSeq)return;S.rec=r;if(S.sub==='customers'&&!S.custs)S.custs=await call('customerList');renderRecords()}
+  catch(e){$('recBody').innerHTML='<div class="empty">'+esc(e.message)+'</div>'}
+}
+async function renderRecords(){
+  $('recSeg').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x.dataset.sub===S.sub));
+  const R=S.rec;if(!R)return;const visits=R.visits,drinks=R.drinks;
+  const net=visits.reduce((s,x)=>s+x.collected,0),disc=visits.reduce((s,x)=>s+x.discount,0),dq=drinks.reduce((s,x)=>s+(x.qty||1),0),nw=visits.filter(x=>x.isNew).length;
+  $('recKpis').innerHTML=kpiHtml([[visits.length,'Bills'],[rs(net),'Collected'],[rs(visits.length?net/visits.length:0),'Average bill'],[rs(disc),'Referral discounts'],[nw,'New customers'],[visits.length-nw,'Returning visits'],[dq,'Free drinks'],[rs(dq*R.drinkCost),'Est. free drink cost']]);
+  const B=$('recBody');const staffName=id=>{const s=R.staff.find(x=>x.id===id);return s?s.name:id};
+  if(S.sub==='days'){
+    const rows=[];let d=R.to;
+    while(d>=R.from&&rows.length<93){const v=visits.filter(x=>x.date===d),dr=drinks.filter(x=>x.date===d);rows.push({d,bills:v.length,net:v.reduce((s,y)=>s+y.collected,0),disc:v.reduce((s,y)=>s+y.discount,0),nw:v.filter(y=>y.isNew).length,dr:dr.reduce((s,y)=>s+(y.qty||1),0)});d=addDays(d,-1)}
+    const max=Math.max(1,...rows.map(r=>r.net));
+    B.innerHTML='<div class="tbl-wrap"><table><thead><tr><th>Date</th><th class="r">Bills</th><th class="r">Collected</th><th></th><th class="r">Discounts</th><th class="r">New</th><th class="r">Free drinks</th></tr></thead><tbody>'+
+      rows.map(r=>'<tr><td>'+new Date(r.d+'T12:00:00').toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short'})+'</td><td class="r num">'+r.bills+'</td><td class="r num">'+rs(r.net)+'</td><td style="width:28%;min-width:80px"><div class="hbar" style="width:'+(r.net/max*100)+'%"></div></td><td class="r num">'+(r.disc?rs(r.disc):'—')+'</td><td class="r num">'+r.nw+'</td><td class="r num">'+r.dr+'</td></tr>').join('')+
+      '</tbody><tfoot><tr><td>Total</td><td class="r num">'+visits.length+'</td><td class="r num">'+rs(net)+'</td><td></td><td class="r num">'+rs(disc)+'</td><td class="r num">'+nw+'</td><td class="r num">'+dq+'</td></tr></tfoot></table></div>';
+  }else if(S.sub==='bills'){
+    B.innerHTML='<input id="billSearch" class="in" placeholder="Search by name, mobile or code"><div class="tbl-wrap"><table><thead><tr><th>When</th><th>Customer</th><th class="r">Bill</th><th class="r">Discount</th><th class="r">Collected</th><th>Tags</th><th>Staff</th></tr></thead><tbody id="billRows"></tbody></table></div>';
+    const draw=()=>{S.billQ=$('billSearch').value;const q=S.billQ.trim().toLowerCase();
+      const list=visits.filter(v=>!q||(v.name||'').toLowerCase().includes(q)||(v.phone||'').includes(q)||(v.code||'').toLowerCase().includes(q));
+      $('billRows').innerHTML=list.length?list.map(v=>'<tr><td class="num">'+(R.from===R.to?'':fmtD(v.date)+' ')+fmtT(v.time)+'</td><td>'+esc(v.name||'—')+'<div class="muted small num">'+esc(v.phone)+'</div></td><td class="r num">'+rs(v.bill)+'</td><td class="r num">'+(v.discount?rs(v.discount):'—')+'</td><td class="r num"><b>'+rs(v.collected)+'</b></td><td><div class="row" style="gap:4px">'+
+        [v.isNew?'<span class="pill green">New</span>':'',v.code?'<span class="pill soft">'+esc(v.code)+'</span>':'',v.stamp?'<span class="pill soft">⭐</span>':'',v.redeem?'<span class="pill yellow">Card reward</span>':'',v.bday?'<span class="pill pink">Birthday</span>':''].join('')+'</div></td><td class="small">'+esc(staffName(v.staff))+'</td></tr>').join('')
+        :'<tr><td colspan="7" class="empty">No bills in this period'+(q?' match that search':'')+'.</td></tr>'};
+    $('billSearch').value=S.billQ||'';$('billSearch').addEventListener('input',draw);draw();
+  }else if(S.sub==='drinks'){
+    const byType={};drinks.forEach(x=>byType[x.type]=(byType[x.type]||0)+(x.qty||1));
+    B.innerHTML='<div class="row">'+Object.keys(byType).map(t=>'<span class="pill soft">'+esc(DTYPE[t]||t)+': '+byType[t]+'</span>').join('')+'</div><div class="tbl-wrap"><table><thead><tr><th>When</th><th>Reason</th><th>Given to</th><th class="r">Qty</th><th>Note</th><th>Staff</th></tr></thead><tbody>'+
+      (drinks.length?drinks.map(x=>'<tr><td class="num">'+fmtD(x.date)+' '+fmtT(x.time)+'</td><td>'+esc(DTYPE[x.type]||x.type)+'</td><td>'+esc(x.to)+'</td><td class="r num">'+(x.qty||1)+'</td><td class="muted">'+esc(x.note)+'</td><td class="small">'+esc(staffName(x.staff))+'</td></tr>').join(''):'<tr><td colspan="6" class="empty">No free drinks in this period.</td></tr>')+'</tbody></table></div>';
+  }else if(S.sub==='codes'){
+    B.innerHTML='<div class="tbl-wrap"><table><thead><tr><th>Referred by</th><th class="r">New customers</th><th class="r">Bills</th><th class="r">Collected</th><th class="r">Discount given</th></tr></thead><tbody>'+
+      (R.codes.length?R.codes.map(o=>'<tr><td>'+esc(o.who)+'</td><td class="r num">'+o.newCustomers+'</td><td class="r num">'+o.bills+'</td><td class="r num">'+rs(o.revenue)+'</td><td class="r num">'+rs(o.discount)+'</td></tr>').join(''):'<tr><td colspan="5" class="empty">No bills from referred customers in this period.</td></tr>')+'</tbody></table></div>';
+  }else if(S.sub==='staff'){
+    const m={};visits.forEach(v=>{const o=m[v.staff]||(m[v.staff]={bills:0,net:0,disc:0});o.bills++;o.net+=v.collected;o.disc+=v.discount});
+    const dm={};drinks.forEach(d=>dm[d.staff]=(dm[d.staff]||0)+(d.qty||1));
+    const ids=[...new Set([...Object.keys(m),...Object.keys(dm)])];
+    B.innerHTML='<div class="tbl-wrap"><table><thead><tr><th>Staff</th><th class="r">Bills</th><th class="r">Collected</th><th class="r">Discounts</th><th class="r">Free drinks logged</th></tr></thead><tbody>'+
+      (ids.length?ids.map(id=>{const o=m[id]||{bills:0,net:0,disc:0};return '<tr><td>'+esc(staffName(id))+'</td><td class="r num">'+o.bills+'</td><td class="r num">'+rs(o.net)+'</td><td class="r num">'+rs(o.disc)+'</td><td class="r num">'+(dm[id]||0)+'</td></tr>'}).join(''):'<tr><td colspan="5" class="empty">Nothing in this period.</td></tr>')+'</tbody></table></div>';
+  }else{
+    if(!S.custs){B.innerHTML='<div class="loading">Loading customers…</div>';try{S.custs=await call('customerList')}catch(e){B.innerHTML='<div class="empty">'+esc(e.message)+'</div>';return}}
+    B.innerHTML='<div class="row"><input id="custSearch" class="in" style="flex:1;min-width:180px" placeholder="Search name or mobile"><select id="custSort" class="in" style="width:auto"><option value="last">Recent first</option><option value="visits">Most visits</option><option value="spent">Most spent</option><option value="stamps">Most stamps</option></select><button class="btn ghost sm" id="custReload">Refresh</button></div><p class="muted small" style="margin:0">All customers ever, not limited to the dates above.</p><div class="tbl-wrap"><table><thead><tr><th>Customer</th><th>Tier</th><th class="r">Visits</th><th>Stamps</th><th class="r">Spent</th><th>Last visit</th><th>App</th><th></th></tr></thead><tbody id="custRows"></tbody></table></div>';
+    const st=S.settings;
+    const draw=()=>{S.custQ=$('custSearch').value;S.custSort=$('custSort').value;const q=S.custQ.trim().toLowerCase();
+      const list=S.custs.filter(c=>!q||(c.name||'').toLowerCase().includes(q)||c.phone.includes(q));
+      const key={last:c=>c.lastVisit||'',visits:c=>c.visits,spent:c=>c.spent,stamps:c=>c.stamps}[S.custSort];list.sort((a,b)=>key(a)<key(b)?1:key(a)>key(b)?-1:0);
+      $('custRows').innerHTML=list.length?list.slice(0,300).map(c=>'<tr><td>'+esc(c.name||'—')+'<div class="muted small num">'+esc(c.phone)+(c.birthday?' · 🎂 '+esc(showBday(c.birthday)):'')+'</div></td><td>'+tierPill(c.tier)+'</td><td class="r num">'+c.visits+'</td><td class="num">'+c.stamps+'/'+st.stampTarget+'</td><td class="r num">'+rs(c.spent)+'</td><td class="num">'+fmtD(c.lastVisit)+'</td><td>'+(c.hasPin?'<span class="pill green">Yes</span>':'<span class="muted small">No</span>')+'</td><td><button class="btn ghost sm" data-counter="'+esc(c.phone)+'">New bill</button></td></tr>').join(''):'<tr><td colspan="8" class="empty">No customers'+(q?' match that search':' yet')+'.</td></tr>'};
+    $('custSearch').value=S.custQ||'';$('custSort').value=S.custSort||'last';$('custSearch').addEventListener('input',draw);$('custSort').addEventListener('change',draw);
+    $('custReload').addEventListener('click',async()=>{S.custs=await call('customerList');draw()});draw();
+  }
+}
+
+/* ---------- loyalty ---------- */
+async function loadLoyalty(){
+  $('loyKpis').innerHTML='<div class="loading">Loading…</div>';
+  try{S.custs=await call('customerList');renderLoyalty()}catch(e){$('loyKpis').innerHTML='<div class="empty">'+esc(e.message)+'</div>'}
+}
+function renderLoyalty(){
+  const st=S.settings,all=S.custs||[],t=dk(new Date());const vis=all.filter(c=>c.visits>0);
+  $('loyKpis').innerHTML=kpiHtml([[all.length,'Members'],[all.filter(c=>c.hasPin).length,'Using the app'],[vis.filter(c=>c.lastVisit>=addDays(t,-30)).length,'Visited in 30 days'],
+    [vis.length?Math.round(vis.filter(c=>c.visits>=2).length/vis.length*100)+'%':'—','Came back at least once'],[all.filter(c=>c.tier==='Silver').length,'Silver'],[all.filter(c=>c.tier==='Gold').length,'Gold'],[all.reduce((s,c)=>s+c.cardsDone,0),'Stamp cards completed']]);
+  const list=(arr,fn,msg)=>arr.length?'<div class="tbl-wrap"><table><tbody>'+arr.map(fn).join('')+'</tbody></table></div>':'<div class="empty" style="padding:12px">'+msg+'</div>';
+  const who=c=>'<td>'+esc(c.name||'—')+'<div class="muted small num">'+esc(c.phone)+'</div></td>';
+  const copy=c=>'<td class="r"><button class="btn ghost sm" data-copy="'+esc(c.phone)+'">Copy no.</button></td>';
+  const bd=all.filter(c=>c.bdayIn!==null&&c.bdayIn<=14).sort((a,b)=>a.bdayIn-b.bdayIn);
+  $('loyBday').innerHTML=list(bd,c=>'<tr>'+who(c)+'<td>'+esc(showBday(c.birthday))+'</td><td>'+(c.bdayIn===0?'<span class="pill pink">Today</span>':'in '+c.bdayIn+' day'+(c.bdayIn>1?'s':''))+'</td>'+copy(c)+'</tr>','No birthdays coming up.');
+  $('loyNear').innerHTML=list(all.filter(c=>c.stamps===st.stampTarget-1),c=>'<tr>'+who(c)+'<td class="num">'+c.stamps+'/'+st.stampTarget+'</td>'+copy(c)+'</tr>','Nobody is one stamp away yet.');
+  $('loyLapseNote').textContent='Regulars (2+ visits) who haven\'t come in for '+st.lapseDays+' days.';
+  const cut=addDays(t,-st.lapseDays);
+  $('loyLapsed').innerHTML=list(all.filter(c=>c.visits>=2&&c.lastVisit&&c.lastVisit<cut).sort((a,b)=>b.visits-a.visits),c=>'<tr>'+who(c)+'<td class="num">'+c.visits+' visits</td><td>Last '+fmtD(c.lastVisit)+'</td>'+copy(c)+'</tr>','No regulars have gone quiet.');
+  $('loyTop').innerHTML=list(all.slice().sort((a,b)=>b.visits-a.visits||b.spent-a.spent).filter(c=>c.visits>0).slice(0,10),c=>'<tr><td>'+esc(c.name||mask(c.phone))+'</td><td>'+tierPill(c.tier)+'</td><td class="r num">'+c.visits+' visits</td><td class="r num">'+rs(c.spent)+'</td></tr>','No customers yet.');
+}
+
+/* ---------- team ---------- */
+const PRIZE=[['1st','Free drink every day this month','prize1'],['2nd','5 free drinks','prize2'],['3rd','3 free drinks','prize3']];
+async function loadTeam(){
+  if(!S.team)$('ambRows').innerHTML='<tr><td colspan="8" class="loading">Loading…</td></tr>';
+  try{S.team=await call('teamData');S.ambs=S.team.rows;renderTeam()}catch(e){$('ambRows').innerHTML='<tr><td colspan="8" class="empty">'+esc(e.message)+'</td></tr>'}
+}
+function renderTeam(){
+  const T=S.team,st=T.settings,rows=T.rows;
+  $('ambSub').textContent=new Date().toLocaleDateString('en-IN',{month:'long',year:'numeric'})+' · week from '+fmtD(T.weekStart)+' · codes end in '+pad2(st.discountPct)+' for '+st.discountPct+'% off';
+  $('ambKpis').innerHTML=kpiHtml([[rows.filter(o=>o.active).length,'Active ambassadors'],[rows.reduce((s,o)=>s+o.month,0),'Referrals this month'],[rows.reduce((s,o)=>s+o.week,0),'Referrals this week']].concat(isOwner()?[[rs(rows.reduce((s,o)=>s+(o.spent||0),0)),'Spent by referred customers']]:[]));
+  $('ambRows').innerHTML=rows.length?rows.map((o,i)=>{
+    const pct=Math.min(100,Math.round(o.week/st.weeklyMin*100));let due='';
+    if(o.weekEarned&&!o.weekGiven)due+='<button class="btn good sm" data-reward="week" data-id="'+esc(o.id)+'">Give weekly drink</button>';else if(o.weekGiven)due+='<span class="pill green">Week ✓</span>';
+    if(o.milestonesDue>0)due+='<button class="btn good sm" data-reward="milestone" data-id="'+esc(o.id)+'">Milestone: 2 drinks</button>';
+    if(!due)due='<span class="muted small">'+Math.max(0,st.weeklyMin-o.week)+' more this week</span>';
+    return '<tr><td><span class="rank'+(i<3&&o.month>0?' g':'')+'">'+(i+1)+'</span></td><td>'+esc(o.name)+(o.active?'':' <span class="pill red">Inactive</span>')+'<div class="muted small">'+esc(o.college)+'</div></td><td class="num"><b>'+esc(o.code)+'</b></td><td class="r num"><b>'+o.month+'</b></td><td><div class="row" style="gap:8px;flex-wrap:nowrap"><div class="bar"><i style="width:'+pct+'%"></i></div><span class="num">'+o.week+'/'+st.weeklyMin+'</span></div></td><td class="r num">'+o.all+'</td>'+(isOwner()?'<td class="r num">'+rs(o.spent)+'</td>':'')+'<td><div class="row" style="gap:6px">'+due+'</div></td></tr>'}).join('')
+    :'<tr><td colspan="8" class="empty">No ambassadors yet.'+(isOwner()?' Add one below.':'')+'</td></tr>';
+  const prev=rows.filter(o=>o.prev>0).sort((a,b)=>b.prev-a.prev).slice(0,3);const pm=new Date(T.prevMonth+'-01T12:00:00').toLocaleDateString('en-IN',{month:'long'});
+  $('lastMonth').innerHTML='<h3>'+pm+' winners</h3>'+(prev.length?'<div class="tbl-wrap"><table><tbody>'+prev.map((o,i)=>'<tr><td><span class="rank g">'+PRIZE[i][0]+'</span></td><td><b>'+esc(o.name)+'</b><div class="muted small">'+o.prev+' referrals</div></td><td>'+PRIZE[i][1]+'</td><td class="r">'+(o.prizeRecorded?'<span class="pill green">Recorded</span>':'<button class="btn good sm" data-reward="'+PRIZE[i][2]+'" data-id="'+esc(o.id)+'">Record prize</button>')+'</td></tr>').join('')+'</tbody></table></div><p class="muted small" style="margin:0">Log the 1st-place daily drinks as they are served: Log a free drink, then Ambassador monthly prize.</p>':'<div class="muted">No referrals last month, so no prizes to give.</div>');
+  if(isOwner()){
+    $('ambList').innerHTML=rows.length?'<div class="tbl-wrap"><table><tbody>'+rows.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(a=>'<tr><td><b>'+esc(a.name)+'</b><div class="muted small">'+esc(a.college)+(a.phone?' · '+esc(a.phone):'')+'</div></td><td class="num"><b>'+esc(a.code)+'</b></td><td class="r"><div class="row" style="justify-content:flex-end;gap:6px;flex-wrap:nowrap"><button class="btn ghost sm" data-edit="'+esc(a.id)+'">Edit</button><button class="btn ghost sm" data-act="'+esc(a.id)+'" data-on="'+(a.active?0:1)+'">'+(a.active?'Deactivate':'Reactivate')+'</button></div></td></tr>').join('')+'</tbody></table></div>':'<div class="empty" style="padding:12px">No ambassadors yet.</div>';
+    updateCodeHint();
+  }
+}
+$('view-team').addEventListener('click',async e=>{
+  const r=e.target.closest('[data-reward]');if(r){r.disabled=true;try{await call('giveAmbReward',r.dataset.id,r.dataset.reward);toast('Recorded');await loadTeam();refreshBoot()}catch(err){r.disabled=false;toast(err.message)}return}
+  const ed=e.target.closest('[data-edit]');if(ed){startEdit(ed.dataset.edit);return}
+  const ac=e.target.closest('[data-act]');if(ac){try{await call('setAmbassadorActive',ac.dataset.act,ac.dataset.on==='1');await loadTeam()}catch(err){toast(err.message)}}
+});
+function startEdit(id){const a=S.team.rows.find(x=>x.id===id);if(!a)return;S.editAmb=id;$('ambFormTitle').textContent='Edit '+a.name;$('ambSubmit').textContent='Save changes';$('ambCancel').hidden=false;
+  $('aName').value=a.name;$('aCollege').value=a.college;$('aPhone').value=a.phone;$('aCode').value=a.code;$('aCode').dataset.touched='1';$('ambErr').textContent='';$('ambFormPanel').classList.add('editing');$('ambFormPanel').scrollIntoView({block:'center'});updateCodeHint()}
+function endEdit(){S.editAmb=null;$('ambFormTitle').textContent='Add an ambassador';$('ambSubmit').textContent='Add ambassador';$('ambCancel').hidden=true;$('ambFormPanel').classList.remove('editing');['aName','aCollege','aPhone','aCode'].forEach(i=>$(i).value='');delete $('aCode').dataset.touched;$('ambErr').textContent='';updateCodeHint()}
+$('ambCancel').addEventListener('click',endEdit);
+function localCode(name){const p=String(name||'').trim().toUpperCase().replace(/[^A-Z ]/g,'').split(/\s+/).filter(Boolean);if(!p.length)return'';const suf=pad2(S.settings.discountPct);const used=new Set((S.team?S.team.rows:S.ambs).filter(a=>a.id!==S.editAmb).map(a=>String(a.code).toUpperCase()));
+  const c=[p[0]+suf];if(p[1])c.push(p[0]+p[1][0]+suf);for(let i=2;i<10;i++)c.push(p[0]+i+suf);return c.find(x=>!used.has(x))||c[c.length-1]}
+function updateCodeHint(){const g=localCode($('aName').value);$('codeHint').innerHTML=g?'Suggested from the name: <b class="num">'+esc(g)+'</b> '+($('aCode').value.toUpperCase()!==g?'<button type="button" class="btn ghost sm" id="useSug">Use this</button>':'✓'):'Codes are the first name plus the discount %, e.g. SNEHA'+pad2(S.settings.discountPct||5)+'.';
+  if($('useSug'))$('useSug').addEventListener('click',()=>{$('aCode').value=g;updateCodeHint()})}
+$('aName').addEventListener('input',()=>{if(!$('aCode').dataset.touched)$('aCode').value=localCode($('aName').value);updateCodeHint()});
+$('aCode').addEventListener('input',()=>{$('aCode').dataset.touched='1';updateCodeHint()});
+$('ambForm').addEventListener('submit',async e=>{e.preventDefault();$('ambErr').textContent='';$('ambSubmit').disabled=true;
+  try{const a=await call('saveAmbassador',{id:S.editAmb||'',name:$('aName').value,college:$('aCollege').value,phone:$('aPhone').value,code:$('aCode').value});toast((S.editAmb?'Saved ':'Added ')+a.name+' · code '+a.code);endEdit();await loadTeam();refreshBoot()}
+  catch(err){$('ambErr').textContent=err.message}finally{$('ambSubmit').disabled=false}});
+$('regenAll').addEventListener('click',async()=>{const b=$('regenAll');if(b.dataset.confirm!=='1'){b.dataset.confirm='1';b.textContent='Tap again to update codes';setTimeout(()=>{b.dataset.confirm='';b.textContent='Match all codes to the current %'},5000);return}
+  b.dataset.confirm='';b.textContent='Match all codes to the current %';try{const n=await call('matchAllCodes');toast(n?n+' code'+(n>1?'s':'')+' updated. Tell those ambassadors.':'All codes already match');await loadTeam()}catch(err){toast(err.message)}});
+
+/* ---------- setup ---------- */
+const NUMF=['discountPct','minBill','discountVisits','referBonusStamps','stampTarget','stampMinBill','freeDrinkCap','drinkCost','silverVisits','goldVisits','lapseDays','weeklyMin','milestoneEvery'];
+const TXTF=['silverPerk','goldPerk'],LINKF=['cafeName','hours','address','googleReviewUrl','whatsappUrl','instagramUrl'];
+$('setSeg').addEventListener('click',e=>{const b=e.target.closest('[data-ss]');if(!b)return;S.ss=b.dataset.ss;renderSetup()});
+function renderSetup(){
+  $('setSeg').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x.dataset.ss===S.ss));
+  document.querySelectorAll('[data-ssv]').forEach(el=>el.hidden=el.dataset.ssv!==S.ss);
+  const st=S.settings;[...NUMF,...TXTF,...LINKF].forEach(k=>{const el=$('s_'+k);if(el&&document.activeElement!==el)el.value=st[k]==null?'':st[k]});
+  $('custLink').textContent=appBase();
+  if(S.ss==='staff')loadStaff();if(S.ss==='feedback')loadFeedback();
+}
+function appBase(){if(window.HT_CALL)return new URL('../',location.href).href;try{return (window.top!==window&&document.referrer?document.referrer:location.href).split('?')[0]}catch(e){return location.href.split('?')[0]}}
+$('copyCustLink').addEventListener('click',async()=>{try{await navigator.clipboard.writeText($('custLink').textContent);toast('Copied')}catch(e){toast('Select the link and copy it')}});
+async function saveSet(keys,msgEl){const o={};keys.forEach(k=>o[k]=$('s_'+k).value);$(msgEl).textContent='Saving…';
+  try{const pct=S.settings.discountPct;S.settings=await call('saveSettings',o);$(msgEl).textContent=S.settings.discountPct!==pct?'Saved. Open Team and tap “Match all codes” so codes end in '+pad2(S.settings.discountPct)+'.':'Saved'}catch(e){$(msgEl).textContent=e.message}}
+$('setForm').addEventListener('submit',e=>{e.preventDefault();saveSet([...NUMF,...TXTF],'setMsg')});
+$('linkForm').addEventListener('submit',e=>{e.preventDefault();saveSet(LINKF,'linkMsg')});
+async function loadStaff(){$('staffList').innerHTML='<div class="loading">Loading…</div>';
+  try{const list=await call('listStaff');$('staffList').innerHTML='<div class="tbl-wrap"><table><tbody>'+list.map(s=>'<tr><td><b>'+esc(s.name)+'</b><div class="muted small">ID: '+esc(s.id)+'</div></td><td>'+(s.role==='owner'?'<span class="pill yellow">Owner</span>':'<span class="pill soft">Counter</span>')+(s.active?'':' <span class="pill red">Off</span>')+'</td><td class="r"><div class="row" style="justify-content:flex-end;gap:6px;flex-wrap:nowrap"><button class="btn ghost sm" data-sedit="'+esc(s.id)+'" data-name="'+esc(s.name)+'" data-role="'+esc(s.role)+'">Edit / reset password</button>'+(s.id!==S.user.id?'<button class="btn ghost sm" data-soff="'+esc(s.id)+'" data-on="'+(s.active?0:1)+'">'+(s.active?'Switch off':'Switch on')+'</button>':'')+'</div></td></tr>').join('')+'</tbody></table></div>'}
+  catch(e){$('staffList').innerHTML='<div class="err">'+esc(e.message)+'</div>'}}
+$('staffList').addEventListener('click',async e=>{
+  const ed=e.target.closest('[data-sedit]');if(ed){S.editStaff=ed.dataset.sedit;$('stFormTitle').textContent='Edit '+ed.dataset.name;$('stName').value=ed.dataset.name;$('stId').value=ed.dataset.sedit;$('stId').disabled=true;$('stRole').value=ed.dataset.role;$('stPw').value='';$('stPw').placeholder='Leave empty to keep the password';$('stSubmit').textContent='Save';$('stCancel').hidden=false;return}
+  const off=e.target.closest('[data-soff]');if(off){try{await call('setStaffActive',off.dataset.soff,off.dataset.on==='1');loadStaff()}catch(err){toast(err.message)}}
+});
+function endStaffEdit(){S.editStaff=null;$('stFormTitle').textContent='Add a staff login';['stName','stId','stPw'].forEach(i=>$(i).value='');$('stId').disabled=false;$('stRole').value='staff';$('stPw').placeholder='At least 6 characters';$('stSubmit').textContent='Add login';$('stCancel').hidden=true;$('stErr').textContent=''}
+$('stCancel').addEventListener('click',endStaffEdit);
+$('stForm').addEventListener('submit',async e=>{e.preventDefault();$('stErr').textContent='';
+  try{await call('saveStaff',{id:S.editStaff||$('stId').value,name:$('stName').value,password:$('stPw').value,role:$('stRole').value});toast('Login saved');endStaffEdit();loadStaff()}catch(err){$('stErr').textContent=err.message}});
+async function loadFeedback(){$('fbList').innerHTML='<div class="loading">Loading…</div>';
+  try{const list=await call('feedbackList');$('fbList').innerHTML=list.length?'<div class="tbl-wrap"><table><thead><tr><th>When</th><th>Customer</th><th>Rating</th><th>Comment</th><th></th></tr></thead><tbody>'+list.map(f=>'<tr><td class="num">'+fmtD(f.date)+'</td><td>'+esc(f.name||'—')+'<div class="muted small num">'+esc(f.phone)+'</div></td><td class="num">'+'★'.repeat(f.rating)+'<span class="muted">'+'★'.repeat(5-f.rating)+'</span></td><td>'+esc(f.comment||'')+'</td><td class="r">'+(f.status==='done'?'<span class="pill green">Done</span>':'<div class="row" style="gap:6px;justify-content:flex-end;flex-wrap:nowrap"><button class="btn ghost sm" data-copy="'+esc(f.phone)+'">Copy no.</button><button class="btn good sm" data-fdone="'+esc(f.time)+'" data-ph="'+esc(f.phone)+'">Mark done</button></div>')+'</td></tr>').join('')+'</tbody></table></div>':'<div class="empty">No feedback yet.</div>'}
+  catch(e){$('fbList').innerHTML='<div class="err">'+esc(e.message)+'</div>'}}
+$('fbList').addEventListener('click',async e=>{const b=e.target.closest('[data-fdone]');if(!b)return;try{await call('markFeedbackDone',b.dataset.fdone,b.dataset.ph);loadFeedback();refreshBoot()}catch(err){toast(err.message)}});
+
+/* ---------- start ---------- */
+try{S.token=localStorage.getItem('ht_staff')}catch(e){}
+if(S.token)start().catch(()=>{});else forceLogin('');
+})();
+</script>
+<script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('../sw.js').catch(function(){})})}</script>
+</body>
+</html>

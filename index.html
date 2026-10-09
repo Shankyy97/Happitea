@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F7C600">
+<meta name="description" content="HappiTea, authentic Vietnamese coffee and tea at Pencil Chowk, Baramati. Collect stamps, get birthday treats and bring your friends.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="HappiTea">
+<meta property="og:title" content="HappiTea Baramati">
+<meta property="og:description" content="Authentic Vietnamese coffee & tea. Get your HappiTea loyalty card.">
+<script src="config.js"></script>
+<script>
+window.HT_CALL=function(fn,args){
+  var url=(window.HT_CONFIG||{}).apiUrl||'';
+  if(!/^https:\/\/script\.google\.com\//.test(url))return Promise.reject(new Error('The app is not connected yet. Put your Apps Script web app link in config.js.'));
+  var body=JSON.stringify({fn:fn,args:args||[]});
+  var send=function(){return fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:body})};
+  var READ=['publicInfo','staffBoot','lookupCustomer','checkCode','teamData','records','customerList','getSettings','listStaff','feedbackList','custHome','custCheckCode','suggestAmbCode'];
+  return send().catch(function(e){if(READ.indexOf(fn)<0)throw e;return new Promise(function(r){setTimeout(r,800)}).then(send)})
+    .then(function(r){if(!r.ok)throw new Error('The server did not answer ('+r.status+'). Try again.');return r.json()},function(){throw new Error('Could not reach the server. Check the internet and try again.')})
+    .then(function(j){if(j&&j.ok)return j.data;throw new Error(j&&j.error||'Something went wrong. Try again.')});
+};
+</script>
+<title>HappiTea</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Figtree:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: phone-first loyalty app. One column (max 480px), yellow brand header, bottom tab bar. */
+:root{
+  --bg:#FFFCF2; --surface:#FFFFFF; --sunk:#F7F1E1; --ink:#26221A; --muted:#6F6755; --line:#ECE4CF;
+  --yellow:#F7C600; --on-yellow:#231C00; --green:#1E7A3B; --green-soft:#E2F2E6; --leaf:#2F6B3A;
+  --red:#B8352A; --red-soft:#FBE3E0; --amber:#8A6400; --amber-soft:#FFF2BF; --pink:#C2477A; --pink-soft:#FBE4EE;
+  --display:"Baloo 2","Trebuchet MS",system-ui,sans-serif; --body:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif; --r:18px;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#15130E; --surface:#1F1C15; --sunk:#29251C; --ink:#F4EFE0; --muted:#A9A08B; --line:#3A3429;
+  --green:#5CC07A; --green-soft:#1A3022; --leaf:#7FCB8C; --red:#F0806F; --red-soft:#3A1E1A; --amber:#F2C94C; --amber-soft:#3A3115; --pink:#F08DB4; --pink-soft:#3A1E2A; color-scheme:dark}}
+*{box-sizing:border-box}
+html,body{margin:0}[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.45}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--green);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+.app{max-width:480px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column}
+.screen{padding:18px 16px 110px;display:flex;flex-direction:column;gap:16px}
+h1,h2,h3{font-family:var(--display);margin:0;line-height:1.1;text-wrap:balance}
+h1{font-size:34px;font-weight:800}h2{font-size:26px;font-weight:800}h3{font-size:19px;font-weight:700}
+p{margin:0}
+.muted{color:var(--muted)}.small{font-size:14px}
+.label{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:12px}
+.field{display:flex;flex-direction:column;gap:6px}
+.in{width:100%;font-size:18px;padding:13px 14px;border-radius:12px;border:2px solid var(--line);background:var(--sunk)}
+.in:focus{border-color:var(--yellow);background:var(--surface);outline:none}
+.pin{font-size:28px;letter-spacing:.5em;text-align:center;font-weight:800}
+.btn{border:0;border-radius:14px;padding:15px 18px;font-weight:800;font-size:17px;cursor:pointer;background:var(--sunk);color:var(--ink);text-align:center;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.btn.primary{background:var(--yellow);color:var(--on-yellow);font-family:var(--display);font-size:20px}
+.btn.dark{background:var(--ink);color:var(--bg)}
+.btn.ghost{background:transparent;border:2px solid var(--line)}
+.btn.green{background:var(--green);color:var(--surface)}
+.btn:disabled{opacity:.5}
+.btn.block{width:100%}
+.link{background:none;border:0;color:var(--ink);text-decoration:underline;font-weight:700;cursor:pointer;padding:6px}
+.err{color:var(--red);font-weight:600;font-size:15px}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 12px;font-size:13px;font-weight:800}
+.pill.gold{background:var(--amber-soft);color:var(--amber);border:1.5px solid var(--amber)}
+.pill.silver{background:var(--sunk);border:1.5px solid var(--muted)}
+.pill.member{background:var(--surface);border:1.5px solid var(--line)}
+.pill.green{background:var(--green);color:var(--surface)}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.between{justify-content:space-between}
+
+/* Landing */
+.hero{background:var(--yellow);color:var(--on-yellow);padding:36px 20px 28px;border-radius:0 0 28px 28px;display:flex;flex-direction:column;gap:10px;position:relative;overflow:hidden}
+.hero .word{font-family:var(--display);font-weight:800;font-size:52px;line-height:.9;letter-spacing:.5px}
+.hero .leafy{position:absolute;right:-30px;top:-20px;width:150px;height:150px;border-radius:50%;background:radial-gradient(circle at 30% 30%,rgba(47,107,58,.35),rgba(47,107,58,0) 60%)}
+.hero p{font-weight:600;max-width:30ch}
+.perks{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.perk{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:4px}
+.perk b{font-family:var(--display);font-size:17px;line-height:1.15}
+.perk span{font-size:13px;color:var(--muted)}
+.perk i{font-style:normal;font-size:24px}
+
+/* Steps */
+.steps{display:flex;gap:6px}.steps i{flex:1;height:6px;border-radius:9px;background:var(--line)}.steps i.on{background:var(--yellow)}
+.topbar{display:flex;align-items:center;gap:10px;padding:14px 16px 0}
+.back{background:var(--sunk);border:0;border-radius:12px;width:42px;height:42px;font-size:20px;cursor:pointer}
+
+/* Stamp card */
+.stampcard{background:var(--yellow);color:var(--on-yellow);border-radius:24px;padding:20px;display:flex;flex-direction:column;gap:14px;box-shadow:0 10px 26px rgba(120,90,0,.18)}
+.stampcard .top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.stampcard .nm{font-family:var(--display);font-weight:800;font-size:26px;line-height:1}
+.dots{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+.dot{aspect-ratio:1;max-width:100%;border-radius:50%;border:2.5px dashed rgba(35,28,0,.4);display:grid;place-items:center;font-weight:800;font-size:13px}
+.dot.on{border:0;background:var(--on-yellow);color:var(--yellow)}
+.dot.free{border:2.5px solid var(--on-yellow);background:rgba(255,255,255,.55);font-size:11px;text-align:center;line-height:1}
+.dot.free.ready{background:var(--green);color:#fff;border-color:var(--green)}
+.banner{border-radius:16px;padding:14px;font-weight:700;display:flex;gap:10px;align-items:center}
+.banner.green{background:var(--green-soft);border:2px solid var(--green)}
+.banner.pink{background:var(--pink-soft);border:2px solid var(--pink)}
+.banner.amber{background:var(--amber-soft);border:2px solid var(--amber)}
+.banner i{font-style:normal;font-size:26px}
+.bigphone{font-family:var(--display);font-size:34px;font-weight:800;letter-spacing:.06em;text-align:center}
+.prog{height:10px;border-radius:9px;background:var(--sunk);overflow:hidden}.prog i{display:block;height:100%;background:var(--green)}
+.hist{display:flex;flex-direction:column}
+.hist div{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);font-size:15px}
+.hist div:last-child{border-bottom:0}
+
+/* Menu */
+.offer{background:var(--green);color:#fff;border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:4px}
+.offer b{font-family:var(--display);font-size:20px;line-height:1.15}
+.mi{display:flex;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+.mi:last-child{border-bottom:0}
+.mi b{font-weight:700}
+
+/* Refer */
+.code{font-family:var(--display);font-weight:800;font-size:40px;letter-spacing:.06em;text-align:center;background:var(--sunk);border:2px dashed var(--muted);border-radius:16px;padding:14px;word-break:break-all}
+
+/* Feedback stars */
+.stars{display:flex;gap:6px;justify-content:center}
+.star{background:none;border:0;font-size:44px;cursor:pointer;color:var(--line);line-height:1;padding:2px}
+.star.on{color:var(--yellow);text-shadow:0 0 0 var(--on-yellow)}
+
+/* Bottom nav */
+.tabbar{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);padding:8px 8px calc(8px + env(safe-area-inset-bottom,0px));z-index:5}
+.tabbar .in4{max-width:480px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
+.tabbar button{background:none;border:0;border-radius:12px;padding:6px 2px;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:12px;font-weight:700;color:var(--muted);cursor:pointer}
+.tabbar button i{font-style:normal;font-size:22px;line-height:1}
+.tabbar button[aria-selected="true"]{color:var(--ink);background:var(--amber-soft)}
+.toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:12px 16px;border-radius:12px;font-weight:700;max-width:calc(100% - 32px);z-index:9;text-align:center}
+.loading{padding:40px;text-align:center;color:var(--muted)}
+@media (prefers-reduced-motion:no-preference){.screen{animation:in .2s ease-out}@keyframes in{from{opacity:.4;transform:translateY(6px)}}}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- LANDING -->
+  <div id="v-landing" hidden>
+    <div class="hero"><div class="leafy"></div>
+      <span class="label" style="color:var(--on-yellow);opacity:.75" id="lAddr">Pencil Chowk, Baramati</span>
+      <div class="word">HAPPI<br>TEA</div>
+      <p>Authentic Vietnamese coffee &amp; tea. Collect stamps, unlock perks, bring your friends.</p>
+    </div>
+    <div class="screen" style="padding-bottom:40px">
+      <button class="btn primary block" data-go="signup">Create my HappiTea ID</button>
+      <button class="btn ghost block" data-go="login">I already have one: log in</button>
+      <button class="btn dark block" id="installBtn" hidden>📲 Install the HappiTea app</button>
+      <p class="muted small" id="iosTip" hidden style="text-align:center">On iPhone: tap the Share button, then “Add to Home Screen”.</p>
+      <div class="perks" id="lPerks"></div>
+      <div id="lOffers" class="card" hidden></div>
+    </div>
+  </div>
+
+  <!-- LOGIN -->
+  <div id="v-login" hidden>
+    <div class="topbar"><button class="back" data-go="landing" aria-label="Back">←</button></div>
+    <form class="screen" id="loginForm" novalidate>
+      <h2>Welcome back</h2>
+      <div class="field"><label class="label" for="liPhone">Mobile number</label><input id="liPhone" class="in num" inputmode="numeric" maxlength="14" autocomplete="tel"></div>
+      <div class="field"><label class="label" for="liPin">4-digit PIN</label><input id="liPin" class="in pin num" inputmode="numeric" maxlength="4" type="password" autocomplete="current-password"></div>
+      <button class="btn primary block" id="liBtn" type="submit">Log in</button>
+      <div class="err" id="liErr"></div>
+      <p class="muted small">Forgot your PIN? Ask at the counter and we'll set a new one.</p>
+    </form>
+  </div>
+
+  <!-- SIGNUP (onboarding) -->
+  <div id="v-signup" hidden>
+    <div class="topbar"><button class="back" id="suBack" aria-label="Back">←</button><div class="steps" style="flex:1" id="suSteps"><i></i><i></i><i></i><i></i></div></div>
+    <form class="screen" id="suForm" novalidate>
+      <div data-step="1" class="stack" style="display:flex;flex-direction:column;gap:14px">
+        <h2>Let's make your HappiTea ID</h2>
+        <p class="muted">It's free. Your mobile number becomes your loyalty card.</p>
+        <div class="field"><label class="label" for="suName">Your name</label><input id="suName" class="in" autocomplete="given-name"></div>
+        <div class="field"><label class="label" for="suPhone">Mobile number</label><input id="suPhone" class="in num" inputmode="numeric" maxlength="14" autocomplete="tel"></div>
+      </div>
+      <div data-step="2" hidden style="display:flex;flex-direction:column;gap:14px">
+        <h2>When's your birthday?</h2>
+        <p class="muted">We'll have a free drink waiting for you in your birthday week. Day and month only.</p>
+        <div class="field"><label class="label" for="suBday">Birthday (DD/MM)</label><input id="suBday" class="in num" inputmode="numeric" placeholder="14/02" maxlength="5"></div>
+      </div>
+      <div data-step="3" hidden style="display:flex;flex-direction:column;gap:14px">
+        <h2>Got a friend's code?</h2>
+        <p class="muted" id="suCodeNote">If a friend or a HappiTea ambassador gave you a code, add it for a discount on your first visit.</p>
+        <div class="field"><label class="label" for="suCode">Code (optional)</label><input id="suCode" class="in num" style="text-transform:uppercase" autocapitalize="characters"></div>
+        <div id="suCodeMsg"></div>
+      </div>
+      <div data-step="4" hidden style="display:flex;flex-direction:column;gap:14px">
+        <h2>Choose a 4-digit PIN</h2>
+        <p class="muted">You'll use it with your mobile number to log in.</p>
+        <div class="field"><label class="label" for="suPin">PIN</label><input id="suPin" class="in pin num" inputmode="numeric" maxlength="4" type="password" autocomplete="new-password"></div>
+        <div class="field"><label class="label" for="suPin2">Type it again</label><input id="suPin2" class="in pin num" inputmode="numeric" maxlength="4" type="password" autocomplete="new-password"></div>
+      </div>
+      <div data-step="5" hidden style="display:flex;flex-direction:column;gap:14px">
+        <h2>We already know you!</h2>
+        <p class="muted">This number has visits at HappiTea. To confirm it's you, enter the amount you paid on your last bill.</p>
+        <div class="field"><label class="label" for="suLast">Last bill amount (₹)</label><input id="suLast" class="in num" inputmode="numeric"></div>
+      </div>
+      <button class="btn primary block" id="suNext" type="submit">Next</button>
+      <button class="link" type="button" id="suSkip" hidden>Skip</button>
+      <div class="err" id="suErr"></div>
+      <p class="muted small" id="suTerms" hidden>By creating an ID you agree that HappiTea stores your name, mobile number, birthday and visits to run the loyalty program.</p>
+    </form>
+  </div>
+
+  <!-- WELCOME -->
+  <div id="v-welcome" hidden>
+    <div class="screen">
+      <h1 id="wTitle">You're in!</h1>
+      <p class="muted">Here's how HappiTea rewards you.</p>
+      <div class="card" id="wRules"></div>
+      <button class="btn primary block" data-go="home">See my card</button>
+    </div>
+  </div>
+
+  <!-- MAIN (tabs) -->
+  <div id="v-main" hidden>
+    <div class="screen" id="t-card"></div>
+    <div class="screen" id="t-menu" hidden></div>
+    <div class="screen" id="t-refer" hidden></div>
+    <div class="screen" id="t-feedback" hidden></div>
+    <div class="screen" id="t-me" hidden></div>
+    <nav class="tabbar"><div class="in4" id="tabs">
+      <button data-tab="card" aria-selected="true"><i>⭐</i>Card</button>
+      <button data-tab="menu"><i>🧋</i>Menu</button>
+      <button data-tab="refer"><i>🎁</i>Refer</button>
+      <button data-tab="feedback"><i>💬</i>Rate us</button>
+      <button data-tab="me"><i>👤</i>Me</button>
+    </div></nav>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(function(){
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const rs=n=>'₹'+Math.round(n||0).toLocaleString('en-IN');
+const fmtD=k=>k?new Date(k+'T12:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'}):'';
+const showBday=md=>md?new Date('2000-'+md+'T12:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'long'}):'';
+function normPhone(v){let p=String(v||'').replace(/\D/g,'');if(p.length>10&&p.startsWith('91'))p=p.slice(2);if(p.length===11&&p.startsWith('0'))p=p.slice(1);return p}
+const S={token:null,info:null,home:null,step:1,codeOk:null,rating:0};
+
+function rawCall(fn,args){
+  if(window.HT_CALL)return window.HT_CALL(fn,args);
+  return new Promise((res,rej)=>google.script.run.withSuccessHandler(res).withFailureHandler(rej)[fn](...args));
+}
+function api(fn,...args){return rawCall(fn,args).catch(e=>{
+  const m=String(e&&e.message||e).replace(/^(Error|Exception):\s*/,'');
+  if(m.indexOf('LOGIN:')===0){logoutLocal();throw new Error(m.slice(6).trim())}throw new Error(m)})}
+let tt;function toast(m){$('toast').textContent=m;$('toast').hidden=false;clearTimeout(tt);tt=setTimeout(()=>$('toast').hidden=true,3500)}
+
+const VIEWS=['landing','login','signup','welcome','main'];
+function show(v){VIEWS.forEach(x=>$('v-'+x).hidden=x!==v);try{window.scrollTo(0,0)}catch(e){}}
+document.addEventListener('click',e=>{const g=e.target.closest('[data-go]');if(!g)return;const to=g.dataset.go;
+  if(to==='home'){openMain()}else if(to==='signup'){startSignup()}else show(to);
+  if(to==='login')setTimeout(()=>$('liPhone').focus(),50)});
+
+/* ---------- landing ---------- */
+function rulesHtml(r,long){
+  const items=[['⭐','Stamp card',r.stampTarget+' visits = 1 free drink (up to '+rs(r.freeDrinkCap)+')'],
+    ['🎂','Birthday treat','A free drink in your birthday week'],
+    ['🥈','Silver at visit '+r.silverVisits,r.silverPerk],['🥇','Gold at visit '+r.goldVisits,r.goldPerk],
+    ['🎁','Bring friends','They get '+r.discountPct+'% off their first visit'+(r.referBonusStamps?', you get '+r.referBonusStamps+' bonus stamp'+(r.referBonusStamps>1?'s':''):'')]];
+  if(long)return items.map(i=>'<div class="row" style="align-items:flex-start;flex-wrap:nowrap"><span style="font-size:26px">'+i[0]+'</span><div><b>'+esc(i[1])+'</b><div class="muted small">'+esc(i[2])+'</div></div></div>').join('')+
+    '<p class="muted small">Stamps: 1 per day on bills of '+rs(r.stampMinBill)+' or more. Give your mobile number at the counter every time.</p>';
+  return items.slice(0,4).map(i=>'<div class="perk"><i>'+i[0]+'</i><b>'+esc(i[1])+'</b><span>'+esc(i[2])+'</span></div>').join('');
+}
+function offersHtml(info){
+  return info.offers.map(o=>'<div class="offer"><span class="label" style="color:#fff;opacity:.8">Offer'+(o.validTo?' · till '+fmtD(o.validTo):'')+'</span><b>'+esc(o.title)+'</b><span>'+esc(o.details)+'</span></div>').join('');
+}
+function renderLanding(){
+  const i=S.info;if(!i)return;$('lAddr').textContent=i.address||'';$('lPerks').innerHTML=rulesHtml(i.rules,false);
+  if(i.offers.length){$('lOffers').hidden=false;$('lOffers').style.background='transparent';$('lOffers').style.border='0';$('lOffers').style.padding='0';$('lOffers').innerHTML=offersHtml(i)}
+}
+
+/* ---------- login ---------- */
+$('loginForm').addEventListener('submit',async e=>{e.preventDefault();$('liErr').textContent='';$('liBtn').disabled=true;$('liBtn').textContent='Logging in…';
+  try{const r=await api('custLogin',$('liPhone').value,$('liPin').value);setToken(r.token);$('liPin').value='';await openMain()}
+  catch(err){$('liErr').textContent=err.message}finally{$('liBtn').disabled=false;$('liBtn').textContent='Log in'}});
+function setToken(t){S.token=t;try{localStorage.setItem('ht_cust',t)}catch(e){}}
+function logoutLocal(){S.token=null;S.home=null;try{localStorage.removeItem('ht_cust')}catch(e){}show('landing')}
+
+/* ---------- signup ---------- */
+function startSignup(){S.step=1;S.codeOk=null;['suName','suPhone','suBday','suCode','suPin','suPin2','suLast'].forEach(i=>$(i).value='');$('suCodeMsg').innerHTML='';
+  if(S.info){const r=S.info.rules;$('suCodeNote').textContent='If a friend or a HappiTea ambassador gave you a code, add it for '+r.discountPct+'% off your first '+(r.discountVisits>1?r.discountVisits+' visits':'visit')+' (bills of '+rs(r.minBill)+' or more).'}
+  show('signup');renderStep();setTimeout(()=>$('suName').focus(),50)}
+function renderStep(){
+  document.querySelectorAll('#suForm [data-step]').forEach(d=>d.hidden=Number(d.dataset.step)!==S.step);
+  document.querySelectorAll('#suSteps i').forEach((d,i)=>d.classList.toggle('on',i<Math.min(S.step,4)));
+  $('suSkip').hidden=!(S.step===2||S.step===3);$('suTerms').hidden=S.step!==4;
+  $('suNext').textContent=S.step===4?'Create my ID':S.step===5?'Confirm':'Next';$('suErr').textContent='';
+  const f={1:'suName',2:'suBday',3:'suCode',4:'suPin',5:'suLast'}[S.step];setTimeout(()=>$(f).focus(),50);
+}
+$('suBack').addEventListener('click',()=>{if(S.step===1||S.step===5){show('landing');return}S.step--;renderStep()});
+$('suSkip').addEventListener('click',()=>{if(S.step===2)$('suBday').value='';if(S.step===3){$('suCode').value='';S.codeOk=null;$('suCodeMsg').innerHTML=''}S.step++;renderStep()});
+function bdayOk(v){if(!v)return true;const m=v.match(/^(\d{1,2})\s*[\/\-. ]\s*(\d{1,2})$/);return !!m&&+m[2]>=1&&+m[2]<=12&&+m[1]>=1&&+m[1]<=31}
+$('suForm').addEventListener('submit',async e=>{
+  e.preventDefault();$('suErr').textContent='';const err=m=>{$('suErr').textContent=m};
+  if(S.step===1){if(!$('suName').value.trim())return err('Please enter your name.');if(normPhone($('suPhone').value).length!==10)return err('Mobile number should be 10 digits.');S.step=2;return renderStep()}
+  if(S.step===2){if(!bdayOk($('suBday').value.trim()))return err('Birthday should look like 14/02 (day/month).');S.step=3;return renderStep()}
+  if(S.step===3){const code=$('suCode').value.trim();if(!code){S.step=4;return renderStep()}
+    $('suNext').disabled=true;try{const r=await api('custCheckCode',code);if(!r.ok){S.codeOk=null;$('suCodeMsg').innerHTML='<div class="err">We couldn\'t find that code. Check it, or tap Skip.</div>';return}
+      S.codeOk=r;const rr=S.info.rules;$('suCodeMsg').innerHTML='<div class="banner green"><i>🎉</i><span>'+esc(r.name)+'\'s code works! You get '+rr.discountPct+'% off your first visit on bills of '+rs(rr.minBill)+' or more.</span></div>';
+      setTimeout(()=>{S.step=4;renderStep()},900)}catch(x){err(x.message)}finally{$('suNext').disabled=false}return}
+  if(S.step===4||S.step===5){
+    if(S.step===4){if(!/^\d{4}$/.test($('suPin').value))return err('PIN must be 4 digits.');if($('suPin').value!==$('suPin2').value)return err('The two PINs don\'t match.')}
+    $('suNext').disabled=true;$('suNext').textContent='Creating…';
+    try{const r=await api('custSignup',{name:$('suName').value,phone:$('suPhone').value,birthday:$('suBday').value,code:$('suCode').value,pin:$('suPin').value,lastBill:S.step===5?$('suLast').value:undefined});
+      if(r.needsVerify){S.step=5;renderStep();return}
+      setToken(r.token);S.home=null;showWelcome()}
+    catch(x){err(x.message)}finally{$('suNext').disabled=false;if(S.step>=4)$('suNext').textContent=S.step===5?'Confirm':'Create my ID'}
+  }
+});
+function showWelcome(){$('wTitle').textContent='Welcome, '+$('suName').value.trim().split(' ')[0]+'!';$('wRules').innerHTML=rulesHtml(S.info.rules,true);show('welcome')}
+
+/* ---------- main ---------- */
+document.querySelectorAll('#tabs button').forEach(b=>b.addEventListener('click',()=>tab(b.dataset.tab)));
+function tab(t){document.querySelectorAll('#tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===t));['card','menu','refer','feedback','me'].forEach(x=>$('t-'+x).hidden=x!==t);try{window.scrollTo(0,0)}catch(e){}}
+async function openMain(){
+  show('main');tab('card');if(!S.home)$('t-card').innerHTML='<div class="loading">Loading your card…</div>';
+  try{S.home=await api('custHome',S.token);S.info=S.home.info;renderAll()}catch(e){if(S.token)$('t-card').innerHTML='<div class="card"><p class="err">'+esc(e.message)+'</p><button class="btn dark" id="retry">Try again</button></div>';if($('retry'))$('retry').onclick=openMain}
+}
+function tierPill(t){return '<span class="pill '+(t==='Gold'?'gold':t==='Silver'?'silver':'member')+'">'+(t==='Gold'?'★ Gold':t)+'</span>'}
+function renderAll(){renderCard();renderMenu();renderRefer();renderFeedback();renderMe()}
+function renderCard(){
+  const m=S.home.me,r=S.info.rules,target=r.stampTarget,ready=m.stamps>=target;
+  let h='<div class="stampcard"><div class="top"><div><div class="label" style="color:var(--on-yellow);opacity:.7">HappiTea card</div><div class="nm">'+esc(m.name||'Friend')+'</div></div>'+tierPill(m.tier)+'</div><div class="dots">';
+  for(let i=0;i<target;i++)h+='<div class="dot'+(i<m.stamps?' on':'')+'">'+(i<m.stamps?'★':i+1)+'</div>';
+  h+='<div class="dot free'+(ready?' ready':'')+'">FREE<br>drink</div></div>';
+  h+='<div style="font-weight:700">'+(ready?'Your free drink is ready! Ask for it at the counter.':(target-m.stamps)+' more stamp'+(target-m.stamps>1?'s':'')+' to a free drink.'+(m.stampedToday?' (Today\'s stamp is in.)':''))+'</div></div>';
+  if(ready)h+='<div class="banner green"><i>🎉</i><span>Free drink worth up to '+rs(r.freeDrinkCap)+' is waiting for you.</span></div>';
+  if(m.bdayDue)h+='<div class="banner pink"><i>🎂</i><span>Happy birthday week! Your birthday drink is on us. Show this at the counter.</span></div>';
+  if(m.discountLeft)h+='<div class="banner amber"><i>🎁</i><span>'+(m.referrerName?esc(m.referrerName)+'\'s code: ':'')+r.discountPct+'% off your first visit on bills of '+rs(r.minBill)+' or more. Applied at the counter.</span></div>';
+  h+='<div class="card" style="text-align:center"><span class="label">At the counter, give your number</span><div class="bigphone num">'+esc(m.phone.slice(0,5)+' '+m.phone.slice(5))+'</div></div>';
+  if(m.nextTier){const pct=Math.min(100,Math.round(m.visits/m.nextTier.at*100));h+='<div class="card"><div class="row between"><b>'+esc(m.nextTier.name)+' at visit '+m.nextTier.at+'</b><span class="muted num">'+m.visits+'/'+m.nextTier.at+'</span></div><div class="prog"><i style="width:'+pct+'%"></i></div><p class="muted small">Unlocks: '+esc(m.nextTier.perk)+'</p></div>'}
+  else h+='<div class="card"><b>You\'re Gold ★</b><p class="muted small">'+esc(m.perk)+'</p></div>';
+  if(m.perk&&m.nextTier)h+='<div class="card"><b>Your '+m.tier+' perk</b><p class="muted small">'+esc(m.perk)+'</p></div>';
+  const hist=S.home.history;
+  h+='<div class="card"><h3>Recent visits</h3>'+(hist.length?'<div class="hist">'+hist.map(v=>'<div><span>'+fmtD(v.date)+'</span><span class="num">'+rs(v.collected)+(v.stamp?' · ⭐':'')+(v.redeem?' · free drink':'')+(v.bday?' · 🎂':'')+'</span></div>').join('')+'</div>':'<p class="muted small">Your visits will show here after your first bill.</p>')+'</div>';
+  $('t-card').innerHTML=h;
+}
+function renderMenu(){
+  const i=S.info;let h='<h2>Menu</h2>';
+  if(i.offers.length)h+=offersHtml(i);
+  const cats={};i.menu.forEach(m=>{(cats[m.category||'Menu']=cats[m.category||'Menu']||[]).push(m)});
+  const keys=Object.keys(cats);
+  h+=keys.length?keys.map(k=>'<div class="card"><h3>'+esc(k)+'</h3><div>'+cats[k].map(m=>'<div class="mi"><div><b>'+esc(m.item)+'</b>'+(m.description?'<div class="muted small">'+esc(m.description)+'</div>':'')+'</div>'+(m.price?'<b class="num">'+rs(m.price)+'</b>':'')+'</div>').join('')+'</div></div>').join(''):'<div class="card muted">The menu is coming soon.</div>';
+  if(i.hours||i.address)h+='<div class="card"><span class="label">Find us</span><b>'+esc(i.address)+'</b>'+(i.hours?'<span class="muted">'+esc(i.hours)+'</span>':'')+'</div>';
+  $('t-menu').innerHTML=h;
+}
+function renderRefer(){
+  const m=S.home.me,r=S.info.rules;
+  const msg='Try HappiTea, authentic Vietnamese coffee & tea at Pencil Chowk, Baramati! Use my code '+m.refCode+' for '+r.discountPct+'% off your first visit.';
+  let h='<h2>Bring a friend</h2><p class="muted">Your friend gets <b>'+r.discountPct+'% off</b> their first visit (bills of '+rs(r.minBill)+'+). '+(r.referBonusStamps?'You get <b>'+r.referBonusStamps+' bonus stamp'+(r.referBonusStamps>1?'s':'')+'</b> when they make their first bill.':'')+'</p>';
+  h+='<div class="card"><span class="label">Your code</span><div class="code num" id="myCode">'+esc(m.refCode)+'</div><button class="btn dark block" id="copyCode">Copy code</button>';
+  h+='<a class="btn green block" target="_blank" rel="noopener" href="https://wa.me/?text='+encodeURIComponent(msg)+'">Share on WhatsApp</a></div>';
+  h+='<div class="card"><div class="row between"><b>Friends who joined</b><span class="bigphone" style="font-size:30px">'+m.friendsJoined+'</span></div><p class="muted small">Counted when they make their first bill with your code.</p></div>';
+  $('t-refer').innerHTML=h;
+  $('copyCode').onclick=async()=>{try{await navigator.clipboard.writeText(m.refCode);toast('Code copied')}catch(e){toast('Your code: '+m.refCode)}};
+}
+function renderFeedback(){
+  S.rating=0;
+  $('t-feedback').innerHTML='<h2>How was your visit?</h2><div class="card"><div class="stars" id="stars">'+[1,2,3,4,5].map(n=>'<button class="star" data-n="'+n+'" aria-label="'+n+' star'+(n>1?'s':'')+'">★</button>').join('')+'</div>'+
+    '<div class="field"><label class="label" for="fbText">Tell us more (optional)</label><textarea id="fbText" class="in" rows="3" style="font-size:16px"></textarea></div><button class="btn primary block" id="fbBtn" disabled>Send</button><div class="err" id="fbErr"></div></div><div id="fbDone"></div>';
+  $('stars').onclick=e=>{const b=e.target.closest('.star');if(!b)return;S.rating=+b.dataset.n;document.querySelectorAll('.star').forEach(s=>s.classList.toggle('on',+s.dataset.n<=S.rating));$('fbBtn').disabled=false};
+  $('fbBtn').onclick=async()=>{$('fbBtn').disabled=true;$('fbErr').textContent='';
+    try{const r=await api('custFeedback',S.token,S.rating,$('fbText').value);
+      $('t-feedback').innerHTML='<h2>Thank you!</h2>'+(r.askReview?'<div class="card"><p>We\'re so glad you enjoyed it. Would you share that on Google? It helps a new café a lot.</p><a class="btn primary block" target="_blank" rel="noopener" href="'+esc(r.reviewUrl)+'">Write a Google review</a></div>':
+        S.rating<=3?'<div class="card"><p>Sorry it wasn\'t perfect. The owner reads every note and may call you to make it right.</p></div>':'<div class="card"><p>Your feedback reached the team.</p></div>')+'<button class="btn ghost block" id="fbAgain">Rate another visit</button>';
+      $('fbAgain').onclick=renderFeedback}
+    catch(e){$('fbErr').textContent=e.message;$('fbBtn').disabled=false}};
+}
+function renderMe(){
+  const m=S.home.me,i=S.info;
+  let h='<h2>'+esc(m.name||'My account')+'</h2><div class="card"><div class="row between"><span class="muted">Mobile</span><b class="num">'+esc(m.phone)+'</b></div><div class="row between"><span class="muted">Visits</span><b class="num">'+m.visits+'</b></div><div class="row between"><span class="muted">Free drinks earned</span><b class="num">'+m.cardsDone+'</b></div>';
+  h+='<div class="row between"><span class="muted">Birthday</span>'+(m.birthday?'<b>'+esc(showBday(m.birthday))+'</b>':'<span class="row" style="gap:6px"><input id="meBday" class="in num" style="width:110px;font-size:16px;padding:8px" placeholder="DD/MM" inputmode="numeric"><button class="btn dark" style="padding:9px 12px;font-size:14px" id="meBdayBtn">Save</button></span>')+'</div></div>';
+  if(i.whatsappUrl||i.instagramUrl)h+='<div class="card"><h3>Stay in touch</h3>'+(i.whatsappUrl?'<a class="btn green block" target="_blank" rel="noopener" href="'+esc(i.whatsappUrl)+'">Join our WhatsApp community</a>':'')+(i.instagramUrl?'<a class="btn ghost block" target="_blank" rel="noopener" href="'+esc(i.instagramUrl)+'">Follow us on Instagram</a>':'')+'</div>';
+  h+='<div class="card"><h3>How rewards work</h3>'+rulesHtml(i.rules,true)+'</div>';
+  h+='<details class="card"><summary style="cursor:pointer;font-weight:700">Change my PIN</summary><div class="field" style="margin-top:10px"><label class="label" for="pOld">Current PIN</label><input id="pOld" class="in pin num" inputmode="numeric" maxlength="4" type="password"></div><div class="field"><label class="label" for="pNew">New PIN</label><input id="pNew" class="in pin num" inputmode="numeric" maxlength="4" type="password"></div><button class="btn dark block" id="pBtn">Change PIN</button><div class="err" id="pErr"></div></details>';
+  h+='<button class="btn ghost block" id="logout">Log out</button>';
+  $('t-me').innerHTML=h;
+  if($('meBdayBtn'))$('meBdayBtn').onclick=async()=>{try{await api('custUpdate',S.token,{birthday:$('meBday').value});toast('Birthday saved');S.home=await api('custHome',S.token);renderAll();tab('me')}catch(e){toast(e.message)}};
+  $('pBtn').onclick=async()=>{$('pErr').textContent='';try{await api('custUpdate',S.token,{oldPin:$('pOld').value,newPin:$('pNew').value});toast('PIN changed');$('pOld').value=$('pNew').value=''}catch(e){$('pErr').textContent=e.message}};
+  $('logout').onclick=()=>{api('logout',S.token).catch(()=>{});logoutLocal()};
+}
+
+/* ---------- install as an app ---------- */
+let deferredPrompt=null;
+const standalone=window.matchMedia&&matchMedia('(display-mode: standalone)').matches||navigator.standalone;
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;if(!standalone)$('installBtn').hidden=false});
+$('installBtn').addEventListener('click',async()=>{if(!deferredPrompt)return;deferredPrompt.prompt();try{await deferredPrompt.userChoice}catch(e){}deferredPrompt=null;$('installBtn').hidden=true});
+if(window.HT_CALL&&!standalone&&/iphone|ipad|ipod/i.test(navigator.userAgent))$('iosTip').hidden=false;
+
+/* ---------- start ---------- */
+(async()=>{
+  try{S.token=localStorage.getItem('ht_cust')}catch(e){}
+  if(S.token){openMain();api('publicInfo').then(i=>{S.info=S.info||i;renderLanding()}).catch(()=>{})}
+  else{show('landing');$('lPerks').innerHTML='<div class="loading" style="grid-column:1/-1">Loading…</div>';
+    try{S.info=await api('publicInfo');renderLanding()}catch(e){$('lPerks').innerHTML='<p class="err" style="grid-column:1/-1">'+esc(e.message)+'</p>'}}
+})();
+})();
+</script>
+<script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){})})}</script>
+</body>
+</html>
